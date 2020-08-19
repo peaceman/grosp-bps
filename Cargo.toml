@@ -1,0 +1,15 @@
+[package]
+name = "balancing-playlist-spreader"
+version = "0.1.0"
+authors = ["peaceman <nixalio@gmail.com>"]
+edition = "2018"
+
+
+[lib]
+name = "bps"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+url = "2.1.1"
+hls_m3u8 = "0.4.0"
