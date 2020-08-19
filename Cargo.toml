@@ -13,3 +13,6 @@ name = "bps"
 [dependencies]
 url = "2.1.1"
 hls_m3u8 = "0.4.0"
+hmac = "0.9.0"
+sha2 = "0.9.1"
+hex = "0.4.2"
