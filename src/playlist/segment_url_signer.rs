@@ -140,9 +140,12 @@ impl <T> PlaylistRewriter for SegmentUrlSigner<T>
         let valid_until = valid_until.unwrap().as_secs();
 
         for seg in playlist.segments.values_mut() {
-            if let Ok(url) = Url::parse(seg.uri()) {
-                let signed_url = self.signer.sign(url, valid_until);
-                seg.set_uri(signed_url.into_string());
+            match Url::parse(seg.uri()) {
+                Ok(url) => {
+                    let signed_url = self.signer.sign(url, valid_until);
+                    seg.set_uri(signed_url.into_string());
+                },
+                Err(e) => eprintln!("Failed to parse URL: {} Err: {}", seg.uri(), e),
             }
         }
 
