@@ -2,6 +2,7 @@ use hls_m3u8::{MediaPlaylist, MediaSegment};
 use crate::edge_node_discovery::EdgeNodeProvider;
 use url::{Url, ParseError};
 use crate::playlist::PlaylistRewriter;
+use std::fmt;
 
 #[cfg(test)]
 mod tests {
@@ -28,6 +29,7 @@ mod tests {
             .target_duration(Duration::from_secs(3))
             .push_segment(build_segment("http://example.com/23.ts"))
             .push_segment(build_segment("http://example.com/24.ts"))
+            .push_segment(build_segment("/25.ts"))
             .build()
             .unwrap();
 
@@ -37,6 +39,7 @@ mod tests {
                 edge_nodes: vec![
                     String::from("https://alpha.com:2323"),
                     String::from("https://beta.com"),
+                    String::from("https://gamma.com"),
                 ]
             }
         );
@@ -52,6 +55,7 @@ mod tests {
             vec![
                 String::from("https://alpha.com:2323/23.ts"),
                 String::from("https://beta.com/24.ts"),
+                String::from("https://gamma.com/25.ts"),
             ],
             uris
         )
@@ -122,8 +126,11 @@ impl <T> PlaylistRewriter for SegmentLoadDistributor<T>
             .zip(playlist.segments.values_mut());
 
         for (edge_node, seg) in edge_node_seg_iter {
-            if let Some(uri) = try_to_change_segment_uri_host(&seg, &edge_node) {
-                seg.set_uri(uri);
+            match try_to_change_segment_uri_host(&seg, &edge_node) {
+                Ok(uri) => {
+                    seg.set_uri(uri);
+                },
+                Err(e) => eprintln!("Failed to change segment uri host: {}", e),
             }
         }
 
@@ -131,13 +138,43 @@ impl <T> PlaylistRewriter for SegmentLoadDistributor<T>
     }
 }
 
-fn try_to_change_segment_uri_host(seg: &MediaSegment, edge_node: &String) -> Option<String> {
-    let edge_node_uri = Url::parse(&edge_node).ok()?;
-    let mut seg_uri = Url::parse(seg.uri()).ok()?;
+#[derive(Debug, Clone)]
+enum HostChangeErr {
+    Scheme(String),
+    Host(Option<String>),
+    Port(Option<u16>),
+    UrlParse(ParseError),
+}
 
-    seg_uri.set_scheme(edge_node_uri.scheme()).ok()?;
-    seg_uri.set_host(edge_node_uri.host_str()).ok()?;
-    seg_uri.set_port(edge_node_uri.port()).ok()?;
+impl fmt::Display for HostChangeErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            HostChangeErr::Scheme(scheme) => write!(f, "Failed to set scheme to `{}`", scheme),
+            HostChangeErr::Host(host) => write!(f, "Failed to set host to `{}`", host.as_ref().unwrap_or(&"None".to_string())),
+            HostChangeErr::Port(port) => write!(f, "Failed to set port to `{}`", port.unwrap_or_default()),
+            HostChangeErr::UrlParse(e) => e.fmt(f),
+        }
+    }
+}
 
-    Some(seg_uri.into_string())
+impl From<ParseError> for HostChangeErr {
+    fn from(e: ParseError) -> Self {
+        HostChangeErr::UrlParse(e)
+    }
+}
+
+fn try_to_change_segment_uri_host(seg: &MediaSegment, edge_node: &String) -> Result<String, HostChangeErr> {
+    let edge_node_uri = Url::parse(&edge_node)?;
+    let mut seg_uri = edge_node_uri.join(seg.uri())?;
+
+    seg_uri.set_scheme(edge_node_uri.scheme())
+        .map_err(|_| HostChangeErr::Scheme(edge_node_uri.scheme().to_string()))?;
+
+    seg_uri.set_host(edge_node_uri.host_str())
+        .map_err(|_| HostChangeErr::Host(edge_node_uri.host_str().map(|s| s.to_string())))?;
+
+    seg_uri.set_port(edge_node_uri.port())
+        .map_err(|_| HostChangeErr::Port(edge_node_uri.port()))?;
+
+    Ok(seg_uri.into_string())
 }
