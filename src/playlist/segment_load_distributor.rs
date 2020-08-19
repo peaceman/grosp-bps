@@ -9,14 +9,7 @@ mod tests {
     use hls_m3u8::{MediaPlaylist, MediaSegment};
     use std::time::Duration;
     use std::borrow::Cow;
-
-    fn build_segment(uri: &'static str) -> MediaSegment {
-        MediaSegment::builder()
-            .duration(Duration::from_secs(3))
-            .uri(uri)
-            .build()
-            .unwrap()
-    }
+    use crate::test_util::build_segment;
 
     struct MockEdgeNodeProvider {
         edge_nodes: Vec<String>,
