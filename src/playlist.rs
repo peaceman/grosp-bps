@@ -1,16 +1,44 @@
-use hls_m3u8::{MediaPlaylist, MediaSegment};
-use std::time::Duration;
-
 mod segment_load_distributor;
 mod segment_url_signer;
 
-trait PlaylistRewriter {
+use hls_m3u8::MediaPlaylist;
+
+pub use segment_url_signer::SegmentUrlSigner;
+pub use segment_url_signer::HmacUrlSigner;
+pub use segment_load_distributor::SegmentLoadDistributor;
+
+pub trait PlaylistRewriter: {
     fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a>;
+}
+
+pub struct CombinedPlaylistRewriter {
+    rewriters: Vec<Box<dyn PlaylistRewriter + Send + Sync>>,
+}
+
+impl CombinedPlaylistRewriter {
+    pub fn new(rewriters: Vec<Box<dyn PlaylistRewriter + Send + Sync>>) -> Self {
+        CombinedPlaylistRewriter {
+            rewriters
+        }
+    }
+}
+
+impl PlaylistRewriter for CombinedPlaylistRewriter {
+    fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
+        let mut playlist = playlist;
+
+        for rewriter in self.rewriters.iter() {
+            playlist = rewriter.rewrite_playlist(playlist);
+        }
+
+        playlist
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use hls_m3u8::MediaSegment;
+    use std::time::Duration;
 
     pub fn build_segment(uri: &'static str) -> MediaSegment {
         MediaSegment::builder()

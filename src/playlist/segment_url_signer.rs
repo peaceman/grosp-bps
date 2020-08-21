@@ -13,7 +13,7 @@ mod tests {
 
     struct MockUrlSigner;
     impl UrlSigner for MockUrlSigner {
-        fn sign(&self, mut url: Url, expiry_timestamp: u64) -> Url {
+        fn sign(&self, mut url: Url, _expiry_timestamp: u64) -> Url {
             url.query_pairs_mut()
                 .append_pair("foo", "bar");
 
@@ -66,16 +66,16 @@ mod tests {
     }
 }
 
-trait UrlSigner {
+pub trait UrlSigner {
     fn sign(&self, url: Url, expiry_timestamp: u64) -> Url;
 }
 
-struct HmacUrlSigner {
+pub struct HmacUrlSigner {
     key: String,
 }
 
 impl HmacUrlSigner {
-    fn new(key: String) -> HmacUrlSigner {
+    pub fn new(key: String) -> HmacUrlSigner {
         HmacUrlSigner {
             key
         }
@@ -106,7 +106,7 @@ impl UrlSigner for HmacUrlSigner {
     }
 }
 
-struct SegmentUrlSigner<T>
+pub struct SegmentUrlSigner<T>
     where T: UrlSigner
 {
     signer: T,
@@ -116,7 +116,7 @@ struct SegmentUrlSigner<T>
 impl <T> SegmentUrlSigner<T>
     where T: UrlSigner
 {
-    fn new(signer: T, expiry_duration: Duration) -> SegmentUrlSigner<T> {
+    pub fn new(signer: T, expiry_duration: Duration) -> SegmentUrlSigner<T> {
         SegmentUrlSigner {
             signer,
             expiry_duration,

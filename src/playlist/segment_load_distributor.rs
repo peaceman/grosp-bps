@@ -7,7 +7,7 @@ use std::fmt;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hls_m3u8::{MediaPlaylist, MediaSegment};
+    use hls_m3u8::MediaPlaylist;
     use std::time::Duration;
     use std::borrow::Cow;
     use crate::test_util::build_segment;
@@ -99,7 +99,7 @@ mod tests {
     }
 }
 
-struct SegmentLoadDistributor<T>
+pub struct SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
     edge_node_provider: T,
@@ -108,7 +108,7 @@ struct SegmentLoadDistributor<T>
 impl <T> SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
-    fn new(edge_node_provider: T) -> SegmentLoadDistributor<T> {
+    pub fn new(edge_node_provider: T) -> SegmentLoadDistributor<T> {
         SegmentLoadDistributor {
             edge_node_provider
         }
