@@ -19,17 +19,21 @@ impl EdgeNodeProvider for Vec<String> {
     }
 }
 
+type EdgeNodeStorage = RwLock<Arc<Vec<String>>>;
+
 pub struct UpdatingEdgeNodeProvider {
-    edge_nodes: RwLock<Arc<Vec<String>>>,
+    edge_nodes: Arc<EdgeNodeStorage>,
 }
 
 impl UpdatingEdgeNodeProvider {
-    pub fn new() -> Arc<Self> {
-        let provider = Arc::new(UpdatingEdgeNodeProvider {
-            edge_nodes: RwLock::new(Arc::new(vec![])),
-        });
+    pub fn new() -> Self {
+        let edge_nodes = Arc::new(RwLock::new(Arc::new(vec![])));
 
-        start_update_edge_nodes_loop(Arc::downgrade(&provider));
+        let provider = UpdatingEdgeNodeProvider {
+            edge_nodes: Arc::clone(&edge_nodes),
+        };
+
+        start_update_edge_nodes_loop(Arc::downgrade(&edge_nodes));
 
         provider
     }
@@ -39,23 +43,23 @@ impl UpdatingEdgeNodeProvider {
     }
 }
 
-fn start_update_edge_nodes_loop(provider: Weak<UpdatingEdgeNodeProvider>) {
+fn start_update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>) {
     tokio::spawn(async move {
-        update_edge_nodes_loop(provider).await
+        update_edge_nodes_loop(edge_nodes).await
     });
 }
 
-async fn update_edge_nodes_loop(provider: Weak<UpdatingEdgeNodeProvider>) {
+async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>) {
     let mut interval = time::interval(time::Duration::from_secs(1));
 
     let mut counter = 0;
     loop {
         interval.tick().await;
 
-        let provider = match provider.upgrade() {
+        let edge_nodes = match edge_nodes.upgrade() {
             Some(provider) => provider,
             None => {
-                println!("Couldn't get reference to the edge node provider, ending update loop");
+                println!("Couldn't get reference to the edge node storage, ending update loop");
                 break
             },
         };
@@ -65,7 +69,7 @@ async fn update_edge_nodes_loop(provider: Weak<UpdatingEdgeNodeProvider>) {
         println!("updating edge nodes: {}", counter);
 
         let new_edge_nodes = vec![format!("http://{}.com", counter)];
-        *provider.edge_nodes.write().unwrap() = Arc::new(new_edge_nodes);
+        *edge_nodes.write().unwrap() = Arc::new(new_edge_nodes);
     }
 }
 

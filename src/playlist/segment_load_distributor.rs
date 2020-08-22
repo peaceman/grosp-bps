@@ -36,13 +36,13 @@ mod tests {
 
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
-            Arc::new(MockEdgeNodeProvider {
+            MockEdgeNodeProvider {
                 edge_nodes: vec![
                     String::from("https://alpha.com:2323"),
                     String::from("https://beta.com"),
                     String::from("https://gamma.com"),
                 ]
-            })
+            }
         );
 
         // rewrite
@@ -74,13 +74,13 @@ mod tests {
 
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
-            Arc::new(MockEdgeNodeProvider {
+            MockEdgeNodeProvider {
                 edge_nodes: vec![
                     String::from("not sure"),
                     String::from("https://beta.com"),
                     String::from("htts:/d/gammam"),
                 ]
-            })
+            }
         );
 
         // rewrite
@@ -103,13 +103,13 @@ mod tests {
 pub struct SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
-    edge_node_provider: Arc<T>,
+    edge_node_provider: T,
 }
 
 impl <T> SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
-    pub fn new(edge_node_provider: Arc<T>) -> SegmentLoadDistributor<T> {
+    pub fn new(edge_node_provider: T) -> SegmentLoadDistributor<T> {
         SegmentLoadDistributor {
             edge_node_provider
         }
