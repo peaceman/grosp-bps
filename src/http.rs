@@ -1,4 +1,5 @@
 mod problem;
+mod client;
 
 use std::sync::Arc;
 use warp::{Filter, filters::BoxedFilter, Reply, Rejection, http::{Response}};
@@ -8,6 +9,8 @@ use hls_m3u8::MediaPlaylist;
 
 use crate::playlist::PlaylistRewriter;
 use self::problem::from_anyhow;
+
+pub use self::client::HttpClient;
 
 pub fn create_routes(
     http_client: Client,

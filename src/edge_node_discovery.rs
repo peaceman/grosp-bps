@@ -1,5 +1,7 @@
 pub mod consul;
 
+use url::Url;
+
 pub use consul::ConsulEdgeNodeProvider;
 
 pub trait EdgeNodeProvider: Send + Sync {
@@ -18,4 +20,9 @@ impl EdgeNodeProvider for Vec<String> {
 
         edge_nodes
     }
+}
+
+#[derive(Debug, PartialEq)]
+struct EdgeNode {
+    url: Url,
 }
