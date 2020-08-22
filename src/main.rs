@@ -1,13 +1,13 @@
 use bps::http::create_routes;
 use reqwest::{Client, Url};
 use bps::playlist::{SegmentUrlSigner, HmacUrlSigner, SegmentLoadDistributor, CombinedPlaylistRewriter, PlaylistRewriter};
-use bps::edge_node_discovery::UpdatingEdgeNodeProvider;
+use bps::edge_node_discovery::ConsulEdgeNodeProvider;
 use std::time::Duration;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    let updating_edge_nodes_provider = UpdatingEdgeNodeProvider::new();
+    let updating_edge_nodes_provider = ConsulEdgeNodeProvider::new();
     let http_client = Client::new();
     let base_url = Url::parse("https://live.vizzywig.de/live/").unwrap();
 

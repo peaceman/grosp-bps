@@ -3,7 +3,6 @@ use crate::edge_node_discovery::EdgeNodeProvider;
 use url::{Url, ParseError};
 use crate::playlist::PlaylistRewriter;
 use std::fmt;
-use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
