@@ -26,7 +26,12 @@ pub fn create_routes(
         .and(playlist_rewriter)
         .and_then(get_playlist);
 
-    get_playlist.boxed()
+    let healthz = warp::path("healthz")
+        .map(|| "🧩");
+
+    healthz
+        .or(get_playlist)
+        .boxed()
 }
 
 #[derive(Debug)]
