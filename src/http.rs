@@ -9,12 +9,10 @@ use hls_m3u8::MediaPlaylist;
 use crate::playlist::PlaylistRewriter;
 use self::problem::from_anyhow;
 
-type TSPlaylistRewriter = Arc<dyn PlaylistRewriter + Send + Sync>;
-
 pub fn create_routes(
     http_client: Client,
     base_url: Url,
-    playlist_rewriter: TSPlaylistRewriter,
+    playlist_rewriter: Arc<dyn PlaylistRewriter>,
 ) -> BoxedFilter<(impl Reply,)> {
     let http_client = warp::any().map(move || http_client.clone());
     let base_url = warp::any().map(move || base_url.clone());
@@ -42,7 +40,7 @@ async fn get_playlist(
     tail: warp::path::Tail,
     http_client: Client,
     base_url: Url,
-    playlist_rewriter: TSPlaylistRewriter,
+    playlist_rewriter: Arc<dyn PlaylistRewriter>,
 ) -> Result<Box<dyn Reply>, Rejection> {
     let upstream_playlist_url = build_playlist_url(&tail, &base_url)
         .map_err(warp::reject::custom)?;

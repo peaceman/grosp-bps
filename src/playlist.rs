@@ -7,16 +7,16 @@ pub use segment_url_signer::SegmentUrlSigner;
 pub use segment_url_signer::HmacUrlSigner;
 pub use segment_load_distributor::SegmentLoadDistributor;
 
-pub trait PlaylistRewriter: {
+pub trait PlaylistRewriter: Send + Sync {
     fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a>;
 }
 
 pub struct CombinedPlaylistRewriter {
-    rewriters: Vec<Box<dyn PlaylistRewriter + Send + Sync>>,
+    rewriters: Vec<Box<dyn PlaylistRewriter>>,
 }
 
 impl CombinedPlaylistRewriter {
-    pub fn new(rewriters: Vec<Box<dyn PlaylistRewriter + Send + Sync>>) -> Self {
+    pub fn new(rewriters: Vec<Box<dyn PlaylistRewriter>>) -> Self {
         CombinedPlaylistRewriter {
             rewriters
         }

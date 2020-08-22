@@ -13,7 +13,6 @@ impl fmt::Display for Problem {
     }
 }
 
-
 impl Reject for Problem {}
 
 pub fn from_anyhow(e: anyhow::Error, status_code: u16) -> Problem {

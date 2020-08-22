@@ -1,4 +1,4 @@
-pub trait EdgeNodeProvider {
+pub trait EdgeNodeProvider: Send + Sync {
     fn get_edge_nodes(&self, amount: usize) -> Vec<String>;
 }
 

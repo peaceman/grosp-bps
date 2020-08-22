@@ -20,7 +20,10 @@ async fn main() {
 
     let segment_load_distributor = SegmentLoadDistributor::new(edge_node_provider);
 
-    let rewriters: Vec<Box<dyn PlaylistRewriter + Send + Sync>> = vec![Box::new(segment_load_distributor), Box::new(segment_signer)];
+    let rewriters: Vec<Box<dyn PlaylistRewriter>> = vec![
+        Box::new(segment_load_distributor),
+        Box::new(segment_signer),
+    ];
 
     let routes = create_routes(http_client, base_url, Arc::new(CombinedPlaylistRewriter::new(
         rewriters

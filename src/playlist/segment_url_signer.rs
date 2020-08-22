@@ -66,7 +66,7 @@ mod tests {
     }
 }
 
-pub trait UrlSigner {
+pub trait UrlSigner: Send + Sync {
     fn sign(&self, url: Url, expiry_timestamp: u64) -> Url;
 }
 
