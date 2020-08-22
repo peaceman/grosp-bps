@@ -3,6 +3,7 @@ use crate::edge_node_discovery::EdgeNodeProvider;
 use url::{Url, ParseError};
 use crate::playlist::PlaylistRewriter;
 use std::fmt;
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
@@ -35,13 +36,13 @@ mod tests {
 
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
-            MockEdgeNodeProvider {
+            Arc::new(MockEdgeNodeProvider {
                 edge_nodes: vec![
                     String::from("https://alpha.com:2323"),
                     String::from("https://beta.com"),
                     String::from("https://gamma.com"),
                 ]
-            }
+            })
         );
 
         // rewrite
@@ -73,13 +74,13 @@ mod tests {
 
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
-            MockEdgeNodeProvider {
+            Arc::new(MockEdgeNodeProvider {
                 edge_nodes: vec![
                     String::from("not sure"),
                     String::from("https://beta.com"),
                     String::from("htts:/d/gammam"),
                 ]
-            }
+            })
         );
 
         // rewrite
@@ -102,13 +103,13 @@ mod tests {
 pub struct SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
-    edge_node_provider: T,
+    edge_node_provider: Arc<T>,
 }
 
 impl <T> SegmentLoadDistributor<T>
     where T: EdgeNodeProvider
 {
-    pub fn new(edge_node_provider: T) -> SegmentLoadDistributor<T> {
+    pub fn new(edge_node_provider: Arc<T>) -> SegmentLoadDistributor<T> {
         SegmentLoadDistributor {
             edge_node_provider
         }
