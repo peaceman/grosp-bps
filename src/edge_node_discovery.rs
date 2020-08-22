@@ -1,4 +1,4 @@
-use std::sync::{RwLock, Arc};
+use std::sync::{RwLock, Arc, Weak};
 use tokio::time;
 
 pub trait EdgeNodeProvider: Send + Sync {
@@ -29,7 +29,7 @@ impl UpdatingEdgeNodeProvider {
             edge_nodes: RwLock::new(Arc::new(vec![])),
         });
 
-        Self::start_update_edge_nodes_loop(Arc::clone(&provider));
+        start_update_edge_nodes_loop(Arc::downgrade(&provider));
 
         provider
     }
@@ -37,26 +37,35 @@ impl UpdatingEdgeNodeProvider {
     fn current_edge_nodes(&self) -> Arc<Vec<String>> {
         Arc::clone(&self.edge_nodes.read().unwrap())
     }
+}
 
-    fn start_update_edge_nodes_loop(provider: Arc<Self>) {
-        tokio::spawn(async move {
-            provider.update_edge_nodes_loop().await
-        });
-    }
+fn start_update_edge_nodes_loop(provider: Weak<UpdatingEdgeNodeProvider>) {
+    tokio::spawn(async move {
+        update_edge_nodes_loop(provider).await
+    });
+}
 
-    async fn update_edge_nodes_loop(&self) {
-        let mut interval = time::interval(time::Duration::from_secs(1));
+async fn update_edge_nodes_loop(provider: Weak<UpdatingEdgeNodeProvider>) {
+    let mut interval = time::interval(time::Duration::from_secs(1));
 
-        let mut counter = 0;
-        loop {
-            interval.tick().await;
-            counter += 1;
+    let mut counter = 0;
+    loop {
+        interval.tick().await;
 
-            println!("updating edge nodes: {}", counter);
+        let provider = match provider.upgrade() {
+            Some(provider) => provider,
+            None => {
+                println!("Couldn't get reference to the edge node provider, ending update loop");
+                break
+            },
+        };
 
-            let new_edge_nodes = vec![format!("http://{}.com", counter)];
-            *self.edge_nodes.write().unwrap() = Arc::new(new_edge_nodes);
-        }
+        counter += 1;
+
+        println!("updating edge nodes: {}", counter);
+
+        let new_edge_nodes = vec![format!("http://{}.com", counter)];
+        *provider.edge_nodes.write().unwrap() = Arc::new(new_edge_nodes);
     }
 }
 

@@ -8,7 +8,6 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() {
     let updating_edge_nodes_provider = UpdatingEdgeNodeProvider::new();
-
     let http_client = Client::new();
     let base_url = Url::parse("https://live.vizzywig.de/live/").unwrap();
 
