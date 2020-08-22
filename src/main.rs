@@ -5,6 +5,8 @@ use bps::edge_node_discovery::ConsulEdgeNodeProvider;
 use bps::http::HttpClient;
 use std::time::Duration;
 use std::sync::Arc;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +26,7 @@ async fn main() {
     //     "http://relay.hsp-events.de:7002".to_string(),
     // ];
 
-    let segment_load_distributor = SegmentLoadDistributor::new(updating_edge_nodes_provider);
+    let segment_load_distributor = SegmentLoadDistributor::new(updating_edge_nodes_provider, StdRng::from_entropy());
 
     let rewriters: Vec<Box<dyn PlaylistRewriter>> = vec![
         Box::new(segment_load_distributor),

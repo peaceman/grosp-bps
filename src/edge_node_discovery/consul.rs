@@ -5,9 +5,8 @@ use url::Url;
 use anyhow::{Context};
 
 use crate::http::HttpClient;
-use super::{EdgeNodeProvider, EdgeNode};
+use super::{EdgeNodeProvider, EdgeNode, EdgeNodeList};
 
-type EdgeNodeList = Arc<Vec<EdgeNode>>;
 type EdgeNodeStorage = RwLock<EdgeNodeList>;
 
 pub struct ConsulEdgeNodeProvider {
@@ -15,20 +14,8 @@ pub struct ConsulEdgeNodeProvider {
 }
 
 impl EdgeNodeProvider for ConsulEdgeNodeProvider {
-    fn get_edge_nodes(&self, amount: usize) -> Vec<String> {
-        let mut edge_nodes = Vec::with_capacity(amount);
-
-        let current_edge_nodes = self.current_edge_nodes();
-        let mut inf_nodes = current_edge_nodes.iter().cycle();
-
-        for _ in 0..amount {
-            match inf_nodes.next() {
-                Some(n) => edge_nodes.push(n.url.to_string()),
-                None => break,
-            }
-        }
-
-        edge_nodes
+    fn get_edge_nodes(&self) -> EdgeNodeList {
+        self.current_edge_nodes()
     }
 }
 
@@ -124,7 +111,7 @@ fn parse_edge_nodes_from_consul_json(json: &str) -> Vec<EdgeNode> {
             .map(|v| v.unwrap())
             .collect()
         )
-        .unwrap_or_else(|| vec![])
+        .unwrap_or_else(Vec::new)
 }
 
 

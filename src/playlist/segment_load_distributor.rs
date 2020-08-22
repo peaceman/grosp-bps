@@ -1,8 +1,13 @@
 use hls_m3u8::{MediaPlaylist, MediaSegment};
-use crate::edge_node_discovery::EdgeNodeProvider;
+use crate::edge_node_discovery::{EdgeNodeProvider, EdgeNodeList};
 use url::{Url, ParseError};
 use crate::playlist::PlaylistRewriter;
 use std::fmt;
+use rand::seq::SliceRandom;
+use rand::Rng;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 mod tests {
@@ -10,15 +15,27 @@ mod tests {
     use hls_m3u8::MediaPlaylist;
     use std::time::Duration;
     use std::borrow::Cow;
+    use url::Url;
+    use std::sync::Arc;
+
+    use rand::Rng;
+    use rand::rngs::mock::StepRng;
+    use rand::thread_rng;
+
     use crate::test_util::build_segment;
+    use crate::edge_node_discovery::{EdgeNodeList, EdgeNode};
 
     struct MockEdgeNodeProvider {
-        edge_nodes: Vec<String>,
+        edge_nodes: Vec<Url>,
     }
 
     impl EdgeNodeProvider for MockEdgeNodeProvider {
-        fn get_edge_nodes(&self, amount: usize) -> Vec<String> {
-            self.edge_nodes.clone()
+        fn get_edge_nodes(&self) -> EdgeNodeList {
+            Arc::new(
+                self.edge_nodes.iter()
+                    .map(|v| EdgeNode { url: v.clone() })
+                    .collect()
+            )
         }
     }
 
@@ -33,15 +50,21 @@ mod tests {
             .build()
             .unwrap();
 
+        let edge_nodes = vec![
+            Url::parse("https://alpha.com:2323").unwrap(),
+            Url::parse("https://beta.com").unwrap(),
+            Url::parse("https://gamma.com").unwrap(),
+        ];
+
+        let mut thread_rng = thread_rng();
+        let mut rng = StepRng::new(thread_rng.gen(), thread_rng.gen());
+
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
             MockEdgeNodeProvider {
-                edge_nodes: vec![
-                    String::from("https://alpha.com:2323"),
-                    String::from("https://beta.com"),
-                    String::from("https://gamma.com"),
-                ]
-            }
+                edge_nodes: edge_nodes.clone()
+            },
+            rng.clone(),
         );
 
         // rewrite
@@ -51,79 +74,49 @@ mod tests {
             .collect();
 
         // assert
-        assert_eq!(
-            vec![
-                String::from("https://alpha.com:2323/23.ts"),
-                String::from("https://beta.com/24.ts"),
-                String::from("https://gamma.com/25.ts"),
-            ],
-            uris
-        )
-    }
+        let file_endings = vec!["/23.ts", "/24.ts", "/25.ts"];
 
-    #[test]
-    fn test_distribution_with_url_errors() {
-        // setup test playlist
-        let media_playlist = MediaPlaylist::builder()
-            .target_duration(Duration::from_secs(3))
-            .push_segment(build_segment("http://example.com/23.ts"))
-            .push_segment(build_segment("http://example.com/24.ts"))
-            .build()
-            .unwrap();
-
-        // setup distributor
-        let distributor = SegmentLoadDistributor::new(
-            MockEdgeNodeProvider {
-                edge_nodes: vec![
-                    String::from("not sure"),
-                    String::from("https://beta.com"),
-                    String::from("htts:/d/gammam"),
-                ]
-            }
-        );
-
-        // rewrite
-        let media_playlist = distributor.rewrite_playlist(media_playlist);
-        let uris: Vec<Cow<str>> = media_playlist.segments.values()
-            .map(|seg| seg.uri().clone())
+        let expected: Vec<String> = file_endings.iter()
+            .map(|v| edge_nodes.choose(&mut rng).unwrap().join(v).unwrap().to_string())
             .collect();
 
-        // assert
-        assert_eq!(
-            vec![
-                String::from("http://example.com/23.ts"),
-                String::from("https://beta.com/24.ts"),
-            ],
-            uris
-        )
+        assert_eq!(expected, uris)
     }
 }
 
-pub struct SegmentLoadDistributor<T>
-    where T: EdgeNodeProvider
+pub struct SegmentLoadDistributor<T, U>
+    where T: EdgeNodeProvider,
+          U: Rng + Send + Sync,
 {
     edge_node_provider: T,
+    rng: Arc<Mutex<U>>,
 }
 
-impl <T> SegmentLoadDistributor<T>
-    where T: EdgeNodeProvider
+impl <T, U> SegmentLoadDistributor<T, U>
+    where T: EdgeNodeProvider,
+          U: Rng + Send + Sync,
 {
-    pub fn new(edge_node_provider: T) -> SegmentLoadDistributor<T> {
+    pub fn new(edge_node_provider: T, rng: U) -> SegmentLoadDistributor<T, U> {
         SegmentLoadDistributor {
-            edge_node_provider
+            edge_node_provider,
+            rng: Arc::new(Mutex::new(rng)),
         }
     }
 }
 
-impl <T> PlaylistRewriter for SegmentLoadDistributor<T>
-    where T: EdgeNodeProvider
+impl <T, U> PlaylistRewriter for SegmentLoadDistributor<T, U>
+    where T: EdgeNodeProvider,
+          U: Rng + Send + Sync + Clone,
 {
     fn rewrite_playlist<'a>(&self, mut playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
-        let edge_nodes = self.edge_node_provider
-            .get_edge_nodes(playlist.segments.num_elements());
+        let edge_nodes = self.edge_node_provider.get_edge_nodes();
+        let rnd_edge_node_iter = {
+            let mut rng = self.rng.lock().unwrap();
+            RndEdgeNodeUrlIter::new(&edge_nodes, StdRng::seed_from_u64(rng.gen::<u64>()))
+        };
 
-        let edge_node_seg_iter = edge_nodes.into_iter()
-            .zip(playlist.segments.values_mut());
+        let edge_node_seg_iter = rnd_edge_node_iter
+                .zip(playlist.segments.values_mut());
 
         for (edge_node, seg) in edge_node_seg_iter {
             match try_to_change_segment_uri_host(&seg, &edge_node) {
@@ -163,18 +156,41 @@ impl From<ParseError> for HostChangeErr {
     }
 }
 
-fn try_to_change_segment_uri_host(seg: &MediaSegment, edge_node: &String) -> Result<String, HostChangeErr> {
-    let edge_node_uri = Url::parse(&edge_node)?;
-    let mut seg_uri = edge_node_uri.join(seg.uri())?;
+fn try_to_change_segment_uri_host(seg: &MediaSegment, edge_node: &Url) -> Result<String, HostChangeErr> {
+    let mut seg_uri = edge_node.join(seg.uri())?;
 
-    seg_uri.set_scheme(edge_node_uri.scheme())
-        .map_err(|_| HostChangeErr::Scheme(edge_node_uri.scheme().to_string()))?;
+    seg_uri.set_scheme(edge_node.scheme())
+        .map_err(|_| HostChangeErr::Scheme(edge_node.scheme().to_string()))?;
 
-    seg_uri.set_host(edge_node_uri.host_str())
-        .map_err(|_| HostChangeErr::Host(edge_node_uri.host_str().map(|s| s.to_string())))?;
+    seg_uri.set_host(edge_node.host_str())
+        .map_err(|_| HostChangeErr::Host(edge_node.host_str().map(|s| s.to_string())))?;
 
-    seg_uri.set_port(edge_node_uri.port())
-        .map_err(|_| HostChangeErr::Port(edge_node_uri.port()))?;
+    seg_uri.set_port(edge_node.port())
+        .map_err(|_| HostChangeErr::Port(edge_node.port()))?;
 
     Ok(seg_uri.into_string())
+}
+
+struct RndEdgeNodeUrlIter<'a, T: Rng> {
+    edge_nodes: &'a EdgeNodeList,
+    rng: T,
+}
+
+impl <'a, T: Rng> RndEdgeNodeUrlIter<'a, T> {
+    fn new(edge_nodes: &'a EdgeNodeList, rng: T) -> Self {
+        RndEdgeNodeUrlIter {
+            edge_nodes,
+            rng,
+        }
+    }
+}
+
+impl <'a, T> Iterator for RndEdgeNodeUrlIter<'a, T>
+    where T: Rng
+{
+    type Item = &'a Url;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.edge_nodes.choose(&mut self.rng).map(|v| &v.url)
+    }
 }
