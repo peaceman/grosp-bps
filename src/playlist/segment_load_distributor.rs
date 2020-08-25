@@ -5,9 +5,6 @@ use crate::playlist::PlaylistRewriter;
 use std::fmt;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 mod tests {
@@ -56,15 +53,16 @@ mod tests {
             Url::parse("https://gamma.com").unwrap(),
         ];
 
-        let mut thread_rng = thread_rng();
-        let mut rng = StepRng::new(thread_rng.gen(), thread_rng.gen());
+        let rng_seed = thread_rng().gen();
+        let mut rng = StepRng::new(rng_seed, rng_seed);
+        let distri_rng = StepRng::new(rng_seed, rng_seed);
 
         // setup distributor
         let distributor = SegmentLoadDistributor::new(
             MockEdgeNodeProvider {
                 edge_nodes: edge_nodes.clone()
             },
-            rng.clone(),
+            Box::new(move || distri_rng.clone()),
         );
 
         // rewrite
@@ -84,36 +82,35 @@ mod tests {
     }
 }
 
+type RngProvider<U> = Box<dyn Fn() -> U + Send + Sync>;
+
 pub struct SegmentLoadDistributor<T, U>
     where T: EdgeNodeProvider,
           U: Rng + Send + Sync,
 {
     edge_node_provider: T,
-    rng: Arc<Mutex<U>>,
+    rng_provider: RngProvider<U>,
 }
 
 impl <T, U> SegmentLoadDistributor<T, U>
     where T: EdgeNodeProvider,
           U: Rng + Send + Sync,
 {
-    pub fn new(edge_node_provider: T, rng: U) -> SegmentLoadDistributor<T, U> {
+    pub fn new(edge_node_provider: T, rng_provider: RngProvider<U>) -> SegmentLoadDistributor<T, U> {
         SegmentLoadDistributor {
             edge_node_provider,
-            rng: Arc::new(Mutex::new(rng)),
+            rng_provider,
         }
     }
 }
 
 impl <T, U> PlaylistRewriter for SegmentLoadDistributor<T, U>
     where T: EdgeNodeProvider,
-          U: Rng + Send + Sync + Clone,
+          U: Rng + Send + Sync,
 {
     fn rewrite_playlist<'a>(&self, mut playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
         let edge_nodes = self.edge_node_provider.get_edge_nodes();
-        let rnd_edge_node_iter = {
-            let mut rng = self.rng.lock().unwrap();
-            RndEdgeNodeUrlIter::new(&edge_nodes, StdRng::seed_from_u64(rng.gen::<u64>()))
-        };
+        let rnd_edge_node_iter = RndEdgeNodeUrlIter::new(&edge_nodes, (self.rng_provider)());
 
         let edge_node_seg_iter = rnd_edge_node_iter
                 .zip(playlist.segments.values_mut());

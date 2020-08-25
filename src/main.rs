@@ -22,11 +22,10 @@ async fn main() {
         Duration::from_secs(300),
     );
 
-    // let edge_node_provider = vec![
-    //     "http://relay.hsp-events.de:7002".to_string(),
-    // ];
-
-    let segment_load_distributor = SegmentLoadDistributor::new(updating_edge_nodes_provider, StdRng::from_entropy());
+    let segment_load_distributor = SegmentLoadDistributor::new(
+        updating_edge_nodes_provider,
+        Box::new(StdRng::from_entropy)
+    );
 
     let rewriters: Vec<Box<dyn PlaylistRewriter>> = vec![
         Box::new(segment_load_distributor),
