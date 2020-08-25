@@ -6,6 +6,7 @@ use warp::{Filter, filters::BoxedFilter, Reply, Rejection, http::{Response}};
 use reqwest::{Client, Url};
 use anyhow::{Context};
 use hls_m3u8::MediaPlaylist;
+use log::{debug};
 
 use crate::playlist::PlaylistRewriter;
 use self::problem::from_anyhow;
@@ -53,7 +54,7 @@ async fn get_playlist(
     let upstream_playlist_url = build_playlist_url(&tail, &base_url)
         .map_err(warp::reject::custom)?;
 
-    println!("upstream playlist url: {}", upstream_playlist_url);
+    debug!("upstream playlist url: {}", upstream_playlist_url);
 
     let upstream_response_body = fetch_playlist_from_upstream(&http_client, &upstream_playlist_url)
         .await

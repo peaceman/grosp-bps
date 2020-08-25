@@ -5,6 +5,7 @@ use crate::playlist::PlaylistRewriter;
 use std::fmt;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use log::{info, warn, error};
 
 #[cfg(test)]
 mod tests {
@@ -120,7 +121,7 @@ impl <T, U> PlaylistRewriter for SegmentLoadDistributor<T, U>
                 Ok(uri) => {
                     seg.set_uri(uri);
                 },
-                Err(e) => eprintln!("Failed to change segment uri host: {}", e),
+                Err(e) => warn!("Failed to change segment uri host: {}", e),
             }
         }
 

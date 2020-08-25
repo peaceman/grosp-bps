@@ -3,6 +3,7 @@ use tokio::time;
 use serde_json::Value;
 use url::Url;
 use anyhow::{Context};
+use log::{info, warn, error};
 
 use crate::http::HttpClient;
 use super::{EdgeNodeProvider, EdgeNode, EdgeNodeList};
@@ -38,6 +39,8 @@ impl ConsulEdgeNodeProvider {
 }
 
 fn start_update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient) {
+    info!("Start update edge nodes loop");
+
     tokio::spawn(async move {
         update_edge_nodes_loop(edge_nodes, http_client).await
     });
@@ -52,18 +55,18 @@ async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: 
         let edge_nodes = match edge_nodes.upgrade() {
             Some(provider) => provider,
             None => {
-                println!("Couldn't get reference to the edge node storage, ending update loop");
+                info!("Couldn't get reference to the edge node storage, ending update loop");
                 break
             },
         };
 
         match fetch_edge_nodes_from_consul(&http_client).await {
             Ok(new_edge_nodes) => {
-                println!("Updating edge nodes from consul: {:?}", &new_edge_nodes);
+                info!("Updating edge nodes from consul: {:?}", &new_edge_nodes);
                 *edge_nodes.write().unwrap() = Arc::new(new_edge_nodes)
             },
             Err(e) => {
-                eprintln!("Failed to update edge nodes from consul: {}", e);
+                error!("Failed to update edge nodes from consul: {}", e);
                 continue
             },
         }
@@ -86,7 +89,7 @@ async fn fetch_edge_nodes_from_consul(http_client: &HttpClient)
 fn parse_edge_nodes_from_consul_json(json: &str) -> Vec<EdgeNode> {
     let root: Value = match serde_json::from_str(json) {
         Err(e) => {
-            eprintln!("Failed to parse json from consul {}", e);
+            error!("Failed to parse json from consul {}", e);
             return vec![];
         },
         Ok(v) => v,
@@ -102,7 +105,7 @@ fn parse_edge_nodes_from_consul_json(json: &str) -> Vec<EdgeNode> {
                     .and_then(|v| Url::parse(v)
                         .map(|v| Some(EdgeNode { url: v }))
                         .unwrap_or_else(|e| {
-                            eprintln!("Failed to parse edge node url {} {}", v, e);
+                            warn!("Failed to parse edge node url {} {}", v, e);
                             None
                         })
                     )

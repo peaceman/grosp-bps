@@ -4,6 +4,7 @@ use hmac::{Hmac, Mac, NewMac};
 use sha2::Sha256;
 use hls_m3u8::MediaPlaylist;
 use std::time::{Duration, UNIX_EPOCH, SystemTime};
+use log::{warn, error};
 
 #[cfg(test)]
 mod tests {
@@ -133,7 +134,7 @@ impl <T> PlaylistRewriter for SegmentUrlSigner<T>
 
         // skip playlist modification if we cant get a valid expiry unix timestamp
         if valid_until.is_err() {
-            eprintln!("Failed to get a valid expiry unix timestamp: {}", valid_until.unwrap_err());
+            error!("Failed to get a valid expiry unix timestamp: {}", valid_until.unwrap_err());
             return playlist;
         }
 
@@ -145,7 +146,7 @@ impl <T> PlaylistRewriter for SegmentUrlSigner<T>
                     let signed_url = self.signer.sign(url, valid_until);
                     seg.set_uri(signed_url.into_string());
                 },
-                Err(e) => eprintln!("Failed to parse URL: {} Err: {}", seg.uri(), e),
+                Err(e) => warn!("Failed to parse URL: {} Err: {}", seg.uri(), e),
             }
         }
 

@@ -10,6 +10,8 @@ use rand::SeedableRng;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let updating_edge_nodes_provider = ConsulEdgeNodeProvider::new(HttpClient::new(
         reqwest::Client::new(),
         Url::parse("http://localhost:8500").unwrap(),
