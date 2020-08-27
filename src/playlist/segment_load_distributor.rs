@@ -5,7 +5,7 @@ use crate::playlist::PlaylistRewriter;
 use std::fmt;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use log::{info, warn, error};
+use log::{warn};
 
 #[cfg(test)]
 mod tests {

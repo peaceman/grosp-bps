@@ -40,6 +40,7 @@ mod tests {
     use hls_m3u8::MediaSegment;
     use std::time::Duration;
 
+    #[allow(dead_code)]
     pub fn build_segment(uri: &'static str) -> MediaSegment {
         MediaSegment::builder()
             .duration(Duration::from_secs(3))
