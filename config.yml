@@ -1,0 +1,12 @@
+---
+consul:
+  base_url: "https://consul"
+  update_interval: 1s
+
+playlist:
+  upstream_base_url: "https://playlist-upstream"
+  segment_signing:
+    key: ""
+    duration: 3s
+
+http: {}
