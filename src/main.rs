@@ -1,9 +1,9 @@
 use bps::http::create_routes;
-use reqwest::{Client, Url};
+use reqwest::Client;
 use bps::playlist::{SegmentUrlSigner, HmacUrlSigner, SegmentLoadDistributor, CombinedPlaylistRewriter, PlaylistRewriter};
 use bps::edge_node_discovery::ConsulEdgeNodeProvider;
 use bps::http::HttpClient;
-use std::time::Duration;
+use bps::settings::Settings;
 use std::sync::Arc;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -12,16 +12,20 @@ use rand::SeedableRng;
 async fn main() {
     env_logger::init();
 
-    let updating_edge_nodes_provider = ConsulEdgeNodeProvider::new(HttpClient::new(
-        reqwest::Client::new(),
-        Url::parse("http://localhost:8500").unwrap(),
-    ));
-    let http_client = Client::new();
-    let base_url = Url::parse("https://live.vizzywig.de/live/").unwrap();
+    let settings = Settings::from_file("config.yml")
+        .expect("Failed to load config");
+
+    let updating_edge_nodes_provider = ConsulEdgeNodeProvider::new(
+        HttpClient::new(
+            Client::new(),
+            settings.consul.base_url,
+        ),
+        settings.consul.update_interval
+    );
 
     let segment_signer = SegmentUrlSigner::new(
-        HmacUrlSigner::new("foobar".to_string()),
-        Duration::from_secs(300),
+        HmacUrlSigner::new(settings.playlist.segment_signing.key),
+        settings.playlist.segment_signing.duration,
     );
 
     let segment_load_distributor = SegmentLoadDistributor::new(
@@ -34,11 +38,11 @@ async fn main() {
         Box::new(segment_signer),
     ];
 
-    let routes = create_routes(http_client, base_url, Arc::new(CombinedPlaylistRewriter::new(
+    let routes = create_routes(Client::new(), settings.playlist.upstream_base_url, Arc::new(CombinedPlaylistRewriter::new(
         rewriters
     )));
 
     warp::serve(routes)
-        .run(([127, 0, 0, 1], 3000))
+        .run(settings.http.socket)
         .await;
 }

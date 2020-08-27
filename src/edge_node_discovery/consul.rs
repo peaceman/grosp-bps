@@ -1,4 +1,5 @@
 use std::sync::{RwLock, Arc, Weak};
+use std::time::Duration;
 use tokio::time;
 use serde_json::Value;
 use url::Url;
@@ -21,14 +22,14 @@ impl EdgeNodeProvider for ConsulEdgeNodeProvider {
 }
 
 impl ConsulEdgeNodeProvider {
-    pub fn new(http_client: HttpClient) -> Self {
+    pub fn new(http_client: HttpClient, update_interval: Duration) -> Self {
         let edge_nodes = Arc::new(RwLock::new(Arc::new(vec![])));
 
         let provider = ConsulEdgeNodeProvider {
             edge_nodes: Arc::clone(&edge_nodes),
         };
 
-        start_update_edge_nodes_loop(Arc::downgrade(&edge_nodes), http_client);
+        start_update_edge_nodes_loop(Arc::downgrade(&edge_nodes), http_client, update_interval);
 
         provider
     }
@@ -38,16 +39,16 @@ impl ConsulEdgeNodeProvider {
     }
 }
 
-fn start_update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient) {
+fn start_update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient, update_interval: Duration) {
     info!("Start update edge nodes loop");
 
     tokio::spawn(async move {
-        update_edge_nodes_loop(edge_nodes, http_client).await
+        update_edge_nodes_loop(edge_nodes, http_client, update_interval).await
     });
 }
 
-async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient) {
-    let mut interval = time::interval(time::Duration::from_secs(1));
+async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient, update_interval: Duration) {
+    let mut interval = time::interval(update_interval);
 
     loop {
         interval.tick().await;

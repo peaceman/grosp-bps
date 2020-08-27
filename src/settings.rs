@@ -23,9 +23,9 @@ const DEFAULT_PLAYLIST_SEGMENT_SIGNING_DURATION_SECS: u64 = 60;
 
 #[derive(Debug)]
 pub struct Settings {
-    consul: Consul,
-    playlist: Playlist,
-    http: Http,
+    pub consul: Consul,
+    pub playlist: Playlist,
+    pub http: Http,
 }
 
 impl Settings {

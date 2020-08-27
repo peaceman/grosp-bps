@@ -8,5 +8,3 @@ playlist:
   segment_signing:
     key: ""
     duration: 3s
-
-http: {}
