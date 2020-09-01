@@ -11,16 +11,21 @@ pub struct SegmentSigning {
 
 impl SegmentSigning {
     pub fn new(sources: Vec<PartialSegmentSigning>) -> Result<Self, SettingsError> {
-        let merged: PartialSegmentSigning = sources.into_iter().fold(Default::default(), |acc, x| {
-            PartialSegmentSigning {
-                key: acc.key.or(x.key),
-                duration: acc.duration.or(x.duration),
-            }
-        });
+        let merged: PartialSegmentSigning =
+            sources
+                .into_iter()
+                .fold(Default::default(), |acc, x| PartialSegmentSigning {
+                    key: acc.key.or(x.key),
+                    duration: acc.duration.or(x.duration),
+                });
 
         Ok(SegmentSigning {
-            key: merged.key.ok_or_else(|| SettingsError::MissingValue("playlist.segment_signing_key".to_string()))?,
-            duration: merged.duration.ok_or_else(|| SettingsError::MissingValue("playlist.segment_signing.duration".to_string()))?,
+            key: merged.key.ok_or_else(|| {
+                SettingsError::MissingValue("playlist.segment_signing_key".to_string())
+            })?,
+            duration: merged.duration.ok_or_else(|| {
+                SettingsError::MissingValue("playlist.segment_signing.duration".to_string())
+            })?,
         })
     }
 }

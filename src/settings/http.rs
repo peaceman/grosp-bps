@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::net::{SocketAddr, IpAddr, Ipv6Addr};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
 use super::SettingsError;
 
@@ -18,14 +18,16 @@ impl Default for Http {
 
 impl Http {
     pub fn new(sources: Vec<PartialHttp>) -> Result<Self, SettingsError> {
-        let merged: PartialHttp = sources.iter().fold(Default::default(), |acc, x| {
-            PartialHttp {
+        let merged: PartialHttp = sources
+            .iter()
+            .fold(Default::default(), |acc, x| PartialHttp {
                 socket: acc.socket.or(x.socket),
-            }
-        });
+            });
 
         Ok(Http {
-            socket: merged.socket.ok_or_else(|| SettingsError::MissingValue("http.socket".to_string()))?,
+            socket: merged
+                .socket
+                .ok_or_else(|| SettingsError::MissingValue("http.socket".to_string()))?,
         })
     }
 }
@@ -37,8 +39,6 @@ pub struct PartialHttp {
 
 impl Default for PartialHttp {
     fn default() -> Self {
-        PartialHttp {
-            socket: None
-        }
+        PartialHttp { socket: None }
     }
 }

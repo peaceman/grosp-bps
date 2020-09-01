@@ -1,20 +1,20 @@
 mod consul;
+mod error;
+mod http;
 mod playlist;
 mod segment_signing;
-mod http;
-mod error;
 
 use consul::*;
+use error::*;
+use http::*;
 use playlist::*;
 use segment_signing::*;
-use http::*;
-use error::*;
 
-use std::net::{SocketAddr, Ipv6Addr, IpAddr};
-use std::time::Duration;
-use std::result::Result;
 use std::fs::File;
 use std::io::Read;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::result::Result;
+use std::time::Duration;
 
 use serde::Deserialize;
 
@@ -30,18 +30,17 @@ pub struct Settings {
 
 impl Settings {
     pub fn from_file(file_path: &str) -> Result<Self, SettingsError> {
-        let reader = File::open(file_path)
-            .map_err(|e| SettingsError::FileParse {
-                path: Some(file_path.to_string()),
-                cause: Box::new(e),
-            })?;
+        let reader = File::open(file_path).map_err(|e| SettingsError::FileParse {
+            path: Some(file_path.to_string()),
+            cause: Box::new(e),
+        })?;
 
         Settings::from_reader(reader)
     }
 
     pub fn from_reader<T: Read>(reader: T) -> Result<Self, SettingsError> {
-        let file_settings: PartialSettings = serde_yaml::from_reader(reader)
-            .map_err(|e| SettingsError::FileParse {
+        let file_settings: PartialSettings =
+            serde_yaml::from_reader(reader).map_err(|e| SettingsError::FileParse {
                 path: None,
                 cause: Box::new(e),
             })?;
@@ -50,19 +49,22 @@ impl Settings {
     }
 
     pub fn merge(mut sources: Vec<PartialSettings>) -> Result<Self, SettingsError> {
-        let consul_sources = sources.iter_mut()
+        let consul_sources = sources
+            .iter_mut()
             .map(|s| s.consul.take())
             .filter(|s| s.is_some())
             .map(|s| s.unwrap())
             .collect();
 
-        let playlist_sources = sources.iter_mut()
+        let playlist_sources = sources
+            .iter_mut()
             .map(|s| s.playlist.take())
             .filter(|s| s.is_some())
             .map(|s| s.unwrap())
             .collect();
 
-        let http_sources = sources.iter_mut()
+        let http_sources = sources
+            .iter_mut()
             .map(|s| s.http.take())
             .filter(|s| s.is_some())
             .map(|s| s.unwrap())
@@ -88,22 +90,23 @@ impl Default for PartialSettings {
         PartialSettings {
             consul: Some(PartialConsul {
                 base_url: None,
-                update_interval: Some(Duration::from_secs(DEFAULT_CONSUL_UPDATE_INTERVAL_SECS))
+                update_interval: Some(Duration::from_secs(DEFAULT_CONSUL_UPDATE_INTERVAL_SECS)),
             }),
             playlist: Some(PartialPlaylist {
                 upstream_base_url: None,
                 segment_signing: Some(PartialSegmentSigning {
                     key: None,
-                    duration:  Some(Duration::from_secs(DEFAULT_PLAYLIST_SEGMENT_SIGNING_DURATION_SECS))
+                    duration: Some(Duration::from_secs(
+                        DEFAULT_PLAYLIST_SEGMENT_SIGNING_DURATION_SECS,
+                    )),
                 }),
             }),
             http: Some(PartialHttp {
-                socket: Some(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 2350))
+                socket: Some(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 2350)),
             }),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -123,15 +126,26 @@ playlist:
 
         println!("{}", yml);
 
-        let settings = Settings::from_reader(yml.as_bytes())
-            .unwrap();
+        let settings = Settings::from_reader(yml.as_bytes()).unwrap();
 
         assert_eq!(settings.consul.base_url.as_str(), "https://consul/");
-        assert_eq!(settings.consul.update_interval.as_secs(), DEFAULT_CONSUL_UPDATE_INTERVAL_SECS);
-        assert_eq!(settings.playlist.upstream_base_url.as_str(), "https://playlist-upstream/");
+        assert_eq!(
+            settings.consul.update_interval.as_secs(),
+            DEFAULT_CONSUL_UPDATE_INTERVAL_SECS
+        );
+        assert_eq!(
+            settings.playlist.upstream_base_url.as_str(),
+            "https://playlist-upstream/"
+        );
         assert_eq!(settings.playlist.segment_signing.key, "dis is key");
-        assert_eq!(settings.playlist.segment_signing.duration.as_secs(), DEFAULT_PLAYLIST_SEGMENT_SIGNING_DURATION_SECS);
-        assert_eq!(settings.http.socket, SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 2350));
+        assert_eq!(
+            settings.playlist.segment_signing.duration.as_secs(),
+            DEFAULT_PLAYLIST_SEGMENT_SIGNING_DURATION_SECS
+        );
+        assert_eq!(
+            settings.http.socket,
+            SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 2350)
+        );
     }
 
     #[test]
@@ -151,14 +165,22 @@ http:
 
         println!("{}", yml);
 
-        let settings = Settings::from_reader(yml.as_bytes())
-            .unwrap();
+        let settings = Settings::from_reader(yml.as_bytes()).unwrap();
 
         assert_eq!(settings.consul.base_url.as_str(), "https://consul/");
         assert_eq!(settings.consul.update_interval.as_secs(), 60 * 60);
-        assert_eq!(settings.playlist.upstream_base_url.as_str(), "https://playlist-upstream/");
+        assert_eq!(
+            settings.playlist.upstream_base_url.as_str(),
+            "https://playlist-upstream/"
+        );
         assert_eq!(settings.playlist.segment_signing.key, "dis is key");
-        assert_eq!(settings.playlist.segment_signing.duration.as_secs(), 30 * 60);
-        assert_eq!(settings.http.socket, SocketAddr::new(IpAddr::from_str("8.8.8.8").unwrap(), 33));
+        assert_eq!(
+            settings.playlist.segment_signing.duration.as_secs(),
+            30 * 60
+        );
+        assert_eq!(
+            settings.http.socket,
+            SocketAddr::new(IpAddr::from_str("8.8.8.8").unwrap(), 33)
+        );
     }
 }

@@ -1,15 +1,15 @@
-mod problem;
 mod client;
+mod problem;
 
-use std::sync::Arc;
-use warp::{Filter, filters::BoxedFilter, Reply, Rejection, http::{Response}};
-use reqwest::{Client, Url};
-use anyhow::{Context};
+use anyhow::Context;
 use hls_m3u8::MediaPlaylist;
-use log::{debug};
+use log::debug;
+use reqwest::{Client, Url};
+use std::sync::Arc;
+use warp::{filters::BoxedFilter, http::Response, Filter, Rejection, Reply};
 
-use crate::playlist::PlaylistRewriter;
 use self::problem::from_anyhow;
+use crate::playlist::PlaylistRewriter;
 
 pub use self::client::HttpClient;
 
@@ -30,12 +30,9 @@ pub fn create_routes(
         .and(playlist_rewriter)
         .and_then(get_playlist);
 
-    let healthz = warp::path("healthz")
-        .map(|| "🧩");
+    let healthz = warp::path("healthz").map(|| "🧩");
 
-    healthz
-        .or(get_playlist)
-        .boxed()
+    healthz.or(get_playlist).boxed()
 }
 
 #[derive(Debug)]
@@ -51,8 +48,8 @@ async fn get_playlist(
     base_url: Url,
     playlist_rewriter: Arc<dyn PlaylistRewriter>,
 ) -> Result<Box<dyn Reply>, Rejection> {
-    let upstream_playlist_url = build_playlist_url(&tail, &base_url)
-        .map_err(warp::reject::custom)?;
+    let upstream_playlist_url =
+        build_playlist_url(&tail, &base_url).map_err(warp::reject::custom)?;
 
     debug!("upstream playlist url: {}", upstream_playlist_url);
 
@@ -68,27 +65,44 @@ async fn get_playlist(
     Ok(Box::new(Response::new(response)))
 }
 
-fn build_playlist_url(tail: &warp::path::Tail, base_url: &Url) -> Result<Url, impl warp::reject::Reject> {
-    base_url.join(tail.as_str())
-        .with_context(|| format!(
-            "Failed to build upstream playlist url from base url `{}` and path tail `{}`",
-            base_url.as_str(), tail.as_str()
-        ))
+fn build_playlist_url(
+    tail: &warp::path::Tail,
+    base_url: &Url,
+) -> Result<Url, impl warp::reject::Reject> {
+    base_url
+        .join(tail.as_str())
+        .with_context(|| {
+            format!(
+                "Failed to build upstream playlist url from base url `{}` and path tail `{}`",
+                base_url.as_str(),
+                tail.as_str()
+            )
+        })
         .map_err(|e| from_anyhow(e, 400))
 }
 
-async fn fetch_playlist_from_upstream(http_client: &Client, url: &Url) -> Result<String, impl warp::reject::Reject> {
-    http_client.get(url.clone())
+async fn fetch_playlist_from_upstream(
+    http_client: &Client,
+    url: &Url,
+) -> Result<String, impl warp::reject::Reject> {
+    http_client
+        .get(url.clone())
         .send()
         .await
-        .with_context(|| format!(
-            "Failed to retrieve playlist from upstream url `{}`", url.as_str()
-        ))
+        .with_context(|| {
+            format!(
+                "Failed to retrieve playlist from upstream url `{}`",
+                url.as_str()
+            )
+        })
         .map_err(|e| from_anyhow(e, 400))?
         .text()
         .await
-        .with_context(|| format!(
-            "Failed to retrieve body from upstream playlist response from url `{}`", url.as_str()
-        ))
+        .with_context(|| {
+            format!(
+                "Failed to retrieve body from upstream playlist response from url `{}`",
+                url.as_str()
+            )
+        })
         .map_err(|e| from_anyhow(e, 400))
 }

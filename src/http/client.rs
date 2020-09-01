@@ -1,4 +1,4 @@
-use reqwest::{Client, RequestBuilder, Method};
+use reqwest::{Client, Method, RequestBuilder};
 use url::Url;
 
 pub struct HttpClient {
@@ -8,10 +8,7 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(inner: Client, base_url: Url) -> Self {
-        HttpClient {
-            inner,
-            base_url,
-        }
+        HttpClient { inner, base_url }
     }
 
     pub fn get(&self, url: &str) -> RequestBuilder {
