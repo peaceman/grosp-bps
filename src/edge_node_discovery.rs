@@ -1,7 +1,7 @@
 pub mod consul;
 
-use url::Url;
 use std::sync::Arc;
+use url::Url;
 
 pub use consul::ConsulEdgeNodeProvider;
 

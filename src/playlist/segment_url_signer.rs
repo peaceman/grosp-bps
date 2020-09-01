@@ -1,10 +1,10 @@
 use crate::playlist::PlaylistRewriter;
-use url::Url;
-use hmac::{Hmac, Mac, NewMac};
-use sha2::Sha256;
 use hls_m3u8::MediaPlaylist;
-use std::time::{Duration, UNIX_EPOCH, SystemTime};
-use log::{warn, error};
+use hmac::{Hmac, Mac, NewMac};
+use log::{error, warn};
+use sha2::Sha256;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use url::Url;
 
 #[cfg(test)]
 mod tests {
@@ -15,8 +15,7 @@ mod tests {
     struct MockUrlSigner;
     impl UrlSigner for MockUrlSigner {
         fn sign(&self, mut url: Url, _expiry_timestamp: u64) -> Url {
-            url.query_pairs_mut()
-                .append_pair("foo", "bar");
+            url.query_pairs_mut().append_pair("foo", "bar");
 
             url
         }
@@ -52,7 +51,9 @@ mod tests {
 
         // rewrite
         let media_playlist = signer.rewrite_playlist(media_playlist);
-        let uris: Vec<Cow<str>> = media_playlist.segments.values()
+        let uris: Vec<Cow<str>> = media_playlist
+            .segments
+            .values()
             .map(|seg| seg.uri().clone())
             .collect();
 
@@ -77,14 +78,11 @@ pub struct HmacUrlSigner {
 
 impl HmacUrlSigner {
     pub fn new(key: String) -> HmacUrlSigner {
-        HmacUrlSigner {
-            key
-        }
+        HmacUrlSigner { key }
     }
 
     fn new_hmac(&self) -> Hmac<Sha256> {
-        Hmac::<Sha256>::new_varkey(self.key.as_bytes())
-            .expect("HMAC can take key of any size")
+        Hmac::<Sha256>::new_varkey(self.key.as_bytes()).expect("HMAC can take key of any size")
     }
 }
 
@@ -108,14 +106,16 @@ impl UrlSigner for HmacUrlSigner {
 }
 
 pub struct SegmentUrlSigner<T>
-    where T: UrlSigner
+where
+    T: UrlSigner,
 {
     signer: T,
     expiry_duration: Duration,
 }
 
-impl <T> SegmentUrlSigner<T>
-    where T: UrlSigner
+impl<T> SegmentUrlSigner<T>
+where
+    T: UrlSigner,
 {
     pub fn new(signer: T, expiry_duration: Duration) -> SegmentUrlSigner<T> {
         SegmentUrlSigner {
@@ -125,16 +125,19 @@ impl <T> SegmentUrlSigner<T>
     }
 }
 
-impl <T> PlaylistRewriter for SegmentUrlSigner<T>
-    where T: UrlSigner
+impl<T> PlaylistRewriter for SegmentUrlSigner<T>
+where
+    T: UrlSigner,
 {
     fn rewrite_playlist<'a>(&self, mut playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
-        let valid_until = (SystemTime::now() + self.expiry_duration)
-            .duration_since(UNIX_EPOCH);
+        let valid_until = (SystemTime::now() + self.expiry_duration).duration_since(UNIX_EPOCH);
 
         // skip playlist modification if we cant get a valid expiry unix timestamp
         if valid_until.is_err() {
-            error!("Failed to get a valid expiry unix timestamp: {}", valid_until.unwrap_err());
+            error!(
+                "Failed to get a valid expiry unix timestamp: {}",
+                valid_until.unwrap_err()
+            );
             return playlist;
         }
 
@@ -145,7 +148,7 @@ impl <T> PlaylistRewriter for SegmentUrlSigner<T>
                 Ok(url) => {
                     let signed_url = self.signer.sign(url, valid_until);
                     seg.set_uri(signed_url.into_string());
-                },
+                }
                 Err(e) => warn!("Failed to parse URL: {} Err: {}", seg.uri(), e),
             }
         }

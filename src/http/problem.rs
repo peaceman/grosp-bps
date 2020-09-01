@@ -1,6 +1,5 @@
-
-use warp::reject::Reject;
 use std::fmt;
+use warp::reject::Reject;
 
 #[derive(Debug)]
 pub struct Problem {
@@ -21,7 +20,5 @@ pub fn from_anyhow(e: anyhow::Error, status_code: u16) -> Problem {
         Err(e) => e,
     };
 
-    Problem {
-        status_code
-    }
+    Problem { status_code }
 }

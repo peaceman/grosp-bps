@@ -1,13 +1,13 @@
-use std::sync::{RwLock, Arc, Weak};
+use anyhow::Context;
+use log::{error, info, warn};
+use serde_json::Value;
+use std::sync::{Arc, RwLock, Weak};
 use std::time::Duration;
 use tokio::time;
-use serde_json::Value;
 use url::Url;
-use anyhow::{Context};
-use log::{info, warn, error};
 
+use super::{EdgeNode, EdgeNodeList, EdgeNodeProvider};
 use crate::http::HttpClient;
-use super::{EdgeNodeProvider, EdgeNode, EdgeNodeList};
 
 type EdgeNodeStorage = RwLock<EdgeNodeList>;
 
@@ -39,15 +39,23 @@ impl ConsulEdgeNodeProvider {
     }
 }
 
-fn start_update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient, update_interval: Duration) {
+fn start_update_edge_nodes_loop(
+    edge_nodes: Weak<EdgeNodeStorage>,
+    http_client: HttpClient,
+    update_interval: Duration,
+) {
     info!("Start update edge nodes loop");
 
-    tokio::spawn(async move {
-        update_edge_nodes_loop(edge_nodes, http_client, update_interval).await
-    });
+    tokio::spawn(
+        async move { update_edge_nodes_loop(edge_nodes, http_client, update_interval).await },
+    );
 }
 
-async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: HttpClient, update_interval: Duration) {
+async fn update_edge_nodes_loop(
+    edge_nodes: Weak<EdgeNodeStorage>,
+    http_client: HttpClient,
+    update_interval: Duration,
+) {
     let mut interval = time::interval(update_interval);
 
     loop {
@@ -57,32 +65,32 @@ async fn update_edge_nodes_loop(edge_nodes: Weak<EdgeNodeStorage>, http_client: 
             Some(provider) => provider,
             None => {
                 info!("Couldn't get reference to the edge node storage, ending update loop");
-                break
-            },
+                break;
+            }
         };
 
         match fetch_edge_nodes_from_consul(&http_client).await {
             Ok(new_edge_nodes) => {
                 info!("Updating edge nodes from consul: {:?}", &new_edge_nodes);
                 *edge_nodes.write().unwrap() = Arc::new(new_edge_nodes)
-            },
+            }
             Err(e) => {
                 error!("Failed to update edge nodes from consul: {}", e);
-                continue
-            },
+                continue;
+            }
         }
     }
 }
 
-async fn fetch_edge_nodes_from_consul(http_client: &HttpClient)
-    -> anyhow::Result<Vec<EdgeNode>> {
-        let response_text = http_client.get("v1/health/service/edge?passing")
-            .send()
-            .await
-            .with_context(|| "Failed to retrieve services from consul")?
-            .text()
-            .await
-            .with_context(|| "Failed to retrieve body from consul services response")?;
+async fn fetch_edge_nodes_from_consul(http_client: &HttpClient) -> anyhow::Result<Vec<EdgeNode>> {
+    let response_text = http_client
+        .get("v1/health/service/edge?passing")
+        .send()
+        .await
+        .with_context(|| "Failed to retrieve services from consul")?
+        .text()
+        .await
+        .with_context(|| "Failed to retrieve body from consul services response")?;
 
     Ok(parse_edge_nodes_from_consul_json(&response_text))
 }
@@ -92,32 +100,33 @@ fn parse_edge_nodes_from_consul_json(json: &str) -> Vec<EdgeNode> {
         Err(e) => {
             error!("Failed to parse json from consul {}", e);
             return vec![];
-        },
+        }
         Ok(v) => v,
     };
 
     root.as_array()
-        .map(|a| a.iter()
-            .map(|info| {
-                info.get("Service")
-                    .and_then(|v| v.get("Meta"))
-                    .and_then(|v| v.get("edge_url"))
-                    .and_then(|v| v.as_str())
-                    .and_then(|v| Url::parse(v)
-                        .map(|v| Some(EdgeNode { url: v }))
-                        .unwrap_or_else(|e| {
-                            warn!("Failed to parse edge node url {} {}", v, e);
-                            None
+        .map(|a| {
+            a.iter()
+                .map(|info| {
+                    info.get("Service")
+                        .and_then(|v| v.get("Meta"))
+                        .and_then(|v| v.get("edge_url"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|v| {
+                            Url::parse(v)
+                                .map(|v| Some(EdgeNode { url: v }))
+                                .unwrap_or_else(|e| {
+                                    warn!("Failed to parse edge node url {} {}", v, e);
+                                    None
+                                })
                         })
-                    )
-            })
-            .filter(|v| v.is_some())
-            .map(|v| v.unwrap())
-            .collect()
-        )
+                })
+                .filter(|v| v.is_some())
+                .map(|v| v.unwrap())
+                .collect()
+        })
         .unwrap_or_else(Vec::new)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -132,7 +141,8 @@ mod tests {
 
     #[test]
     fn test_edge_nodes_from_consul_json_success() {
-        let result = parse_edge_nodes_from_consul_json(r#"[
+        let result = parse_edge_nodes_from_consul_json(
+            r#"[
             {
                 "Service": {
                     "Meta": {
@@ -147,10 +157,13 @@ mod tests {
                     }
                 }
             }
-        ]"#);
+        ]"#,
+        );
 
         assert_eq!(
-            vec![EdgeNode { url: Url::parse("https://example.com").unwrap() }],
+            vec![EdgeNode {
+                url: Url::parse("https://example.com").unwrap()
+            }],
             result
         )
     }

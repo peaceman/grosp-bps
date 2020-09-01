@@ -1,6 +1,6 @@
-use url::Url;
-use std::time::Duration;
 use serde::Deserialize;
+use std::time::Duration;
+use url::Url;
 
 use super::SettingsError;
 
@@ -12,16 +12,21 @@ pub struct Consul {
 
 impl Consul {
     pub fn new(sources: Vec<PartialConsul>) -> Result<Self, SettingsError> {
-        let merged: PartialConsul = sources.into_iter().fold(Default::default(), |acc, x| {
-            PartialConsul {
-                base_url: acc.base_url.or(x.base_url),
-                update_interval: acc.update_interval.or(x.update_interval)
-            }
-        });
+        let merged: PartialConsul =
+            sources
+                .into_iter()
+                .fold(Default::default(), |acc, x| PartialConsul {
+                    base_url: acc.base_url.or(x.base_url),
+                    update_interval: acc.update_interval.or(x.update_interval),
+                });
 
         Ok(Consul {
-            base_url: merged.base_url.ok_or_else(|| SettingsError::MissingValue("consul.base_url".to_string()))?,
-            update_interval: merged.update_interval.ok_or_else(|| SettingsError::MissingValue("consule.update_interval".to_string()))?,
+            base_url: merged
+                .base_url
+                .ok_or_else(|| SettingsError::MissingValue("consul.base_url".to_string()))?,
+            update_interval: merged.update_interval.ok_or_else(|| {
+                SettingsError::MissingValue("consule.update_interval".to_string())
+            })?,
         })
     }
 }

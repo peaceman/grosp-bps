@@ -21,7 +21,7 @@ impl fmt::Display for SettingsError {
                 }
 
                 Ok(())
-            },
+            }
             SettingsError::Message(msg) => write!(f, "{}", msg),
             SettingsError::MissingValue(path) => write!(f, "Missing settings value at {}", path),
         }

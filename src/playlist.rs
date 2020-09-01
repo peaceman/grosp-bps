@@ -3,9 +3,9 @@ mod segment_url_signer;
 
 use hls_m3u8::MediaPlaylist;
 
-pub use segment_url_signer::SegmentUrlSigner;
-pub use segment_url_signer::HmacUrlSigner;
 pub use segment_load_distributor::SegmentLoadDistributor;
+pub use segment_url_signer::HmacUrlSigner;
+pub use segment_url_signer::SegmentUrlSigner;
 
 pub trait PlaylistRewriter: Send + Sync {
     fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a>;
@@ -17,9 +17,7 @@ pub struct CombinedPlaylistRewriter {
 
 impl CombinedPlaylistRewriter {
     pub fn new(rewriters: Vec<Box<dyn PlaylistRewriter>>) -> Self {
-        CombinedPlaylistRewriter {
-            rewriters
-        }
+        CombinedPlaylistRewriter { rewriters }
     }
 }
 

@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use url::Url;
 
-use super::segment_signing::SegmentSigning;
 use super::segment_signing::PartialSegmentSigning;
+use super::segment_signing::SegmentSigning;
 use super::SettingsError;
 
 #[derive(Debug)]
@@ -13,21 +13,27 @@ pub struct Playlist {
 
 impl Playlist {
     pub fn new(mut sources: Vec<PartialPlaylist>) -> Result<Self, SettingsError> {
-        let merged: PartialPlaylist = sources.iter_mut().fold(Default::default(), |acc, x| {
-            PartialPlaylist {
-                upstream_base_url: acc.upstream_base_url.or_else(|| x.upstream_base_url.take()),
-                segment_signing: None,
-            }
-        });
+        let merged: PartialPlaylist =
+            sources
+                .iter_mut()
+                .fold(Default::default(), |acc, x| PartialPlaylist {
+                    upstream_base_url: acc.upstream_base_url.or_else(|| x.upstream_base_url.take()),
+                    segment_signing: None,
+                });
 
-        let ss = SegmentSigning::new(sources.iter_mut()
-            .map(|s| s.segment_signing.take())
-            .filter(|s| s.is_some())
-            .map(|s| s.unwrap())
-            .collect())?;
+        let ss = SegmentSigning::new(
+            sources
+                .iter_mut()
+                .map(|s| s.segment_signing.take())
+                .filter(|s| s.is_some())
+                .map(|s| s.unwrap())
+                .collect(),
+        )?;
 
         Ok(Playlist {
-            upstream_base_url: merged.upstream_base_url.ok_or_else(|| SettingsError::MissingValue("playlist.upstream_base_url".to_string()))?,
+            upstream_base_url: merged.upstream_base_url.ok_or_else(|| {
+                SettingsError::MissingValue("playlist.upstream_base_url".to_string())
+            })?,
             segment_signing: ss,
         })
     }
