@@ -4,10 +4,6 @@ version = "0.1.0"
 authors = ["peaceman <nixalio@gmail.com>"]
 edition = "2018"
 
-
-[lib]
-name = "bps"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
