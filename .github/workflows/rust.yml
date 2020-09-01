@@ -71,3 +71,13 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+          
+  docker:
+    runs-on: ubuntu-latest
+    name: Build and publish docker image
+    needs: [check, test, lints]
+    steps:
+      - name: docker build and publish
+        run: |
+          source .docker/build.sh
+          ./.docker/publish-docker-hub.sh
