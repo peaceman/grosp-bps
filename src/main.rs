@@ -1,9 +1,11 @@
-use bps::http::create_routes;
+use balancing_playlist_spreader::{
+    http::{create_routes, HttpClient},
+    playlist::{SegmentUrlSigner, HmacUrlSigner, SegmentLoadDistributor, CombinedPlaylistRewriter, PlaylistRewriter},
+    edge_node_discovery::ConsulEdgeNodeProvider,
+    settings::Settings
+};
+
 use reqwest::Client;
-use bps::playlist::{SegmentUrlSigner, HmacUrlSigner, SegmentLoadDistributor, CombinedPlaylistRewriter, PlaylistRewriter};
-use bps::edge_node_discovery::ConsulEdgeNodeProvider;
-use bps::http::HttpClient;
-use bps::settings::Settings;
 use std::sync::Arc;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
