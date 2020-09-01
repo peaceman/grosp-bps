@@ -10,6 +10,9 @@ set -euo pipefail
 COMPILE_IMAGE_ID_FILE=$(mktemp)
 RUNTIME_IMAGE_ID_FILE=$(mktemp)
 
+docker pull "$DOCKER_REPO":"compile-stage-$DOCKER_TARGET_TAG" || true
+docker pull "$DOCKER_REPO":"$DOCKER_TARGET_TAG" || true
+
 # build the compile stage
 docker build --target compile-image \
     --iidfile "$COMPILE_IMAGE_ID_FILE" \
