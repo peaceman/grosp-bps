@@ -32,7 +32,10 @@ mod tests {
             Arc::new(
                 self.edge_nodes
                     .iter()
-                    .map(|v| EdgeNode { url: v.clone() })
+                    .map(|v| EdgeNode {
+                        url: v.clone(),
+                        group: String::from("group"),
+                    })
                     .collect(),
             )
         }

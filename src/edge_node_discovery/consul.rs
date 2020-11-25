@@ -134,6 +134,4 @@ impl TryFrom<&ServiceEntry> for EdgeNode {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}
