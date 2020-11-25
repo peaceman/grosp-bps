@@ -1,4 +1,3 @@
-mod client;
 mod problem;
 
 use anyhow::Context;
@@ -10,8 +9,6 @@ use warp::{filters::BoxedFilter, http::Response, Filter, Rejection, Reply};
 
 use self::problem::from_anyhow;
 use crate::playlist::PlaylistRewriter;
-
-pub use self::client::HttpClient;
 
 pub fn create_routes(
     http_client: Client,

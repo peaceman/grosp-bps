@@ -1,6 +1,6 @@
 use balancing_playlist_spreader::{
     edge_node_discovery::ConsulEdgeNodeProvider,
-    http::{create_routes, HttpClient},
+    http::create_routes,
     playlist::{
         CombinedPlaylistRewriter, HmacUrlSigner, PlaylistRewriter, SegmentLoadDistributor,
         SegmentUrlSigner,
@@ -14,15 +14,18 @@ use reqwest::Client;
 use std::sync::Arc;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let settings = Settings::from_file("config.yml").expect("Failed to load config");
+    let consul = consul_api_client::Client::new(
+        consul_api_client::Config::builder()
+            .address(settings.consul.base_url.to_string())
+            .build()?,
+    )?;
 
-    let updating_edge_nodes_provider = ConsulEdgeNodeProvider::new(
-        HttpClient::new(Client::new(), settings.consul.base_url),
-        settings.consul.update_interval,
-    );
+    let updating_edge_nodes_provider =
+        ConsulEdgeNodeProvider::new(consul, settings.consul.update_interval);
 
     let segment_signer = SegmentUrlSigner::new(
         HmacUrlSigner::new(settings.playlist.segment_signing.key),
@@ -42,4 +45,5 @@ async fn main() {
     );
 
     warp::serve(routes).run(settings.http.socket).await;
+    Ok(())
 }

@@ -14,4 +14,5 @@ pub type EdgeNodeList = Arc<Vec<EdgeNode>>;
 #[derive(Debug, PartialEq)]
 pub struct EdgeNode {
     pub url: Url,
+    pub group: String,
 }

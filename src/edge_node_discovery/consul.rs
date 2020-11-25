@@ -1,13 +1,13 @@
-use anyhow::Context;
+use consul_api_client::Client;
 use log::{error, info, warn};
-use serde_json::Value;
 use std::sync::{Arc, RwLock, Weak};
 use std::time::Duration;
 use tokio::time;
 use url::Url;
 
 use super::{EdgeNode, EdgeNodeList, EdgeNodeProvider};
-use crate::http::HttpClient;
+use consul_api_client::health::{Health, ServiceEntry};
+use std::convert::{TryFrom, TryInto};
 
 type EdgeNodeStorage = RwLock<EdgeNodeList>;
 
@@ -22,14 +22,14 @@ impl EdgeNodeProvider for ConsulEdgeNodeProvider {
 }
 
 impl ConsulEdgeNodeProvider {
-    pub fn new(http_client: HttpClient, update_interval: Duration) -> Self {
+    pub fn new(consul: Client, update_interval: Duration) -> Self {
         let edge_nodes = Arc::new(RwLock::new(Arc::new(vec![])));
 
         let provider = ConsulEdgeNodeProvider {
             edge_nodes: Arc::clone(&edge_nodes),
         };
 
-        start_update_edge_nodes_loop(Arc::downgrade(&edge_nodes), http_client, update_interval);
+        start_update_edge_nodes_loop(Arc::downgrade(&edge_nodes), consul, update_interval);
 
         provider
     }
@@ -41,19 +41,17 @@ impl ConsulEdgeNodeProvider {
 
 fn start_update_edge_nodes_loop(
     edge_nodes: Weak<EdgeNodeStorage>,
-    http_client: HttpClient,
+    consul: Client,
     update_interval: Duration,
 ) {
     info!("Start update edge nodes loop");
 
-    tokio::spawn(
-        async move { update_edge_nodes_loop(edge_nodes, http_client, update_interval).await },
-    );
+    tokio::spawn(async move { update_edge_nodes_loop(edge_nodes, consul, update_interval).await });
 }
 
 async fn update_edge_nodes_loop(
     edge_nodes: Weak<EdgeNodeStorage>,
-    http_client: HttpClient,
+    client: Client,
     update_interval: Duration,
 ) {
     let mut interval = time::interval(update_interval);
@@ -69,7 +67,7 @@ async fn update_edge_nodes_loop(
             }
         };
 
-        match fetch_edge_nodes_from_consul(&http_client).await {
+        match fetch_edge_nodes_from_consul(&client).await {
             Ok(new_edge_nodes) => {
                 info!("Updating edge nodes from consul: {:?}", &new_edge_nodes);
                 *edge_nodes.write().unwrap() = Arc::new(new_edge_nodes)
@@ -82,89 +80,60 @@ async fn update_edge_nodes_loop(
     }
 }
 
-async fn fetch_edge_nodes_from_consul(http_client: &HttpClient) -> anyhow::Result<Vec<EdgeNode>> {
-    let response_text = http_client
-        .get("v1/health/service/edge?passing")
-        .send()
+async fn fetch_edge_nodes_from_consul(client: &Client) -> anyhow::Result<Vec<EdgeNode>> {
+    let service_name = "edge"; // todo configuration
+    let (services, _meta) = client
+        .service(service_name, Some("state=active"), true, None, None)
         .await
-        .with_context(|| "Failed to retrieve services from consul")?
-        .text()
-        .await
-        .with_context(|| "Failed to retrieve body from consul services response")?;
+        .map_err(anyhow::Error::new)?;
 
-    Ok(parse_edge_nodes_from_consul_json(&response_text))
+    let edge_nodes = services
+        .into_iter()
+        .filter_map(try_to_convert_service_entry_to_edge_node)
+        .collect();
+
+    Ok(edge_nodes)
 }
 
-fn parse_edge_nodes_from_consul_json(json: &str) -> Vec<EdgeNode> {
-    let root: Value = match serde_json::from_str(json) {
-        Err(e) => {
-            error!("Failed to parse json from consul {}", e);
-            return vec![];
-        }
-        Ok(v) => v,
-    };
+fn try_to_convert_service_entry_to_edge_node(service_entry: ServiceEntry) -> Option<EdgeNode> {
+    let se = &service_entry;
 
-    root.as_array()
-        .map(|a| {
-            a.iter()
-                .map(|info| {
-                    info.get("Service")
-                        .and_then(|v| v.get("Meta"))
-                        .and_then(|v| v.get("edge_url"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|v| {
-                            Url::parse(v)
-                                .map(|v| Some(EdgeNode { url: v }))
-                                .unwrap_or_else(|e| {
-                                    warn!("Failed to parse edge node url {} {}", v, e);
-                                    None
-                                })
-                        })
-                })
-                .filter(|v| v.is_some())
-                .map(|v| v.unwrap())
-                .collect()
+    let en: Result<EdgeNode, _> = se.try_into();
+
+    en.map(Some).unwrap_or_else(|e| {
+        warn!(
+            "Failed to convert consul service entry into edge node; Error: {} for node: {}",
+            e, service_entry.Node.Node
+        );
+        None
+    })
+}
+
+impl TryFrom<&ServiceEntry> for EdgeNode {
+    type Error = &'static str;
+
+    fn try_from(value: &ServiceEntry) -> Result<Self, Self::Error> {
+        let url = value
+            .Service
+            .Meta
+            .get("edge_url")
+            .ok_or("Missing edge_url in service meta")
+            .and_then(|url| Url::parse(url.as_ref()).map_err(|_| "Failed to parse edge_url"))?;
+
+        let group = value
+            .Service
+            .Meta
+            .get("node_group")
+            .ok_or("Missing node_group in service meta")?;
+
+        Ok(Self {
+            url,
+            group: group.clone(),
         })
-        .unwrap_or_else(Vec::new)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_edge_nodes_from_consul_json_error() {
-        let result = parse_edge_nodes_from_consul_json("{}");
-
-        assert!(result.is_empty(), "the parse result is not empty");
-    }
-
-    #[test]
-    fn test_edge_nodes_from_consul_json_success() {
-        let result = parse_edge_nodes_from_consul_json(
-            r#"[
-            {
-                "Service": {
-                    "Meta": {
-                        "edge_url": "https://example.com"
-                    }
-                }
-            },
-            {
-                "Service": {
-                    "Meta": {
-                        "edge_url": "is dis url?"
-                    }
-                }
-            }
-        ]"#,
-        );
-
-        assert_eq!(
-            vec![EdgeNode {
-                url: Url::parse("https://example.com").unwrap()
-            }],
-            result
-        )
-    }
 }
