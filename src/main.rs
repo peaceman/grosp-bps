@@ -5,31 +5,33 @@ use balancing_playlist_spreader::{
         CombinedPlaylistRewriter, HmacUrlSigner, PlaylistRewriter, SegmentLoadDistributor,
         SegmentUrlSigner,
     },
-    settings::Settings,
 };
 
+use balancing_playlist_spreader::config::load_config;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Client;
 use std::sync::Arc;
+use warp::Rejection;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let settings = Settings::from_file("config.yml").expect("Failed to load config");
+    let config = load_config()?;
+
     let consul = consul_api_client::Client::new(
         consul_api_client::Config::builder()
-            .address(settings.consul.base_url.to_string())
+            .address(config.consul.base_url.to_string())
             .build()?,
     )?;
 
     let updating_edge_nodes_provider =
-        ConsulEdgeNodeProvider::new(consul, settings.consul.update_interval);
+        ConsulEdgeNodeProvider::new(consul, config.consul.update_interval);
 
     let segment_signer = SegmentUrlSigner::new(
-        HmacUrlSigner::new(settings.playlist.segment_signing.key),
-        settings.playlist.segment_signing.duration,
+        HmacUrlSigner::new(config.playlist.segment_signing.key.clone()),
+        config.playlist.segment_signing.duration,
     );
 
     let segment_load_distributor =
@@ -40,10 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let routes = create_routes(
         Client::new(),
-        settings.playlist.upstream_base_url,
+        Arc::clone(&config),
         Arc::new(CombinedPlaylistRewriter::new(rewriters)),
     );
 
-    warp::serve(routes).run(settings.http.socket).await;
+    warp::serve(routes).run(config.http.socket).await;
     Ok(())
 }

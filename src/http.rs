@@ -1,35 +1,56 @@
+mod auth;
 mod problem;
 
 use anyhow::Context;
 use hls_m3u8::MediaPlaylist;
 use log::debug;
 use reqwest::{Client, Url};
+use serde::Deserialize;
 use std::sync::Arc;
-use warp::{filters::BoxedFilter, http::Response, Filter, Rejection, Reply};
+use warp::{filters::BoxedFilter, http::Response, reject, Filter, Rejection, Reply};
 
 use self::problem::from_anyhow;
+use crate::config::AppConfig;
+use crate::http::auth::{validate_jwt, Claims};
 use crate::playlist::PlaylistRewriter;
+use warp::http::StatusCode;
+
+pub type WebResult<T> = std::result::Result<T, Rejection>;
+
+pub async fn jwt_handler(claims: Claims) -> WebResult<impl Reply> {
+    Ok(Response::new(
+        serde_yaml::to_string(&claims).map_err(|e| reject::not_found())?,
+    ))
+}
 
 pub fn create_routes(
     http_client: Client,
-    base_url: Url,
+    config: AppConfig,
     playlist_rewriter: Arc<dyn PlaylistRewriter>,
 ) -> BoxedFilter<(impl Reply,)> {
     let http_client = warp::any().map(move || http_client.clone());
-    let base_url = warp::any().map(move || base_url.clone());
+    let base_url = warp::any().map({
+        let config = Arc::clone(&config);
+        move || config.playlist.upstream_base_url.clone()
+    });
     let playlist_rewriter = warp::any().map(move || Arc::clone(&playlist_rewriter));
 
     let get_playlist = warp::path("playlist")
         .and(warp::get())
         .and(warp::path::tail())
+        .and(validate_jwt(Arc::clone(&config)))
         .and(http_client)
         .and(base_url)
         .and(playlist_rewriter)
         .and_then(get_playlist);
 
+    let jwt_test = warp::path("jwt-test")
+        .and(validate_jwt(Arc::clone(&config)))
+        .and_then(jwt_handler);
+
     let healthz = warp::path("healthz").map(|| "🧩");
 
-    healthz.or(get_playlist).boxed()
+    healthz.or(get_playlist).or(jwt_test).boxed()
 }
 
 #[derive(Debug)]
@@ -41,6 +62,7 @@ impl warp::reject::Reject for FetchError {}
 
 async fn get_playlist(
     tail: warp::path::Tail,
+    claims: Claims,
     http_client: Client,
     base_url: Url,
     playlist_rewriter: Arc<dyn PlaylistRewriter>,

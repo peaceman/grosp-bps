@@ -24,4 +24,7 @@ rand = "0.7"
 log = "0.4"
 env_logger = "0.7"
 humantime-serde = "1.0.0"
+jsonwebtoken = "7.2"
+futures = "0.3.8"
+thiserror = "1.0.22"
 consul-api-client = { git = "https://github.com/peaceman/rust-consul-api-client", branch = "master" }
