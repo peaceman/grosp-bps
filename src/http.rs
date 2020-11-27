@@ -78,7 +78,11 @@ async fn get_playlist(
 
     let response = upstream_response_body
         .parse::<MediaPlaylist>()
-        .map(|pl| playlist_rewriter.rewrite_playlist(pl, &claims).to_string())
+        .map(|pl| {
+            playlist_rewriter
+                .rewrite_playlist(pl, claims.node_group())
+                .to_string()
+        })
         .unwrap_or(upstream_response_body);
 
     Ok(Box::new(Response::new(response)))

@@ -72,7 +72,7 @@ mod tests {
         );
 
         // rewrite
-        let media_playlist = distributor.rewrite_playlist(media_playlist);
+        let media_playlist = distributor.rewrite_playlist(media_playlist, "test");
         let uris: Vec<Cow<str>> = media_playlist
             .segments
             .values()
@@ -133,9 +133,9 @@ where
     fn rewrite_playlist<'a>(
         &self,
         mut playlist: MediaPlaylist<'a>,
-        claims: &Claims,
+        node_group: &str,
     ) -> MediaPlaylist<'a> {
-        let edge_nodes = self.edge_node_provider.get_edge_nodes(claims.node_group());
+        let edge_nodes = self.edge_node_provider.get_edge_nodes(node_group);
         let rnd_edge_node_iter = RndEdgeNodeUrlIter::new(&edge_nodes, (self.rng_provider)());
 
         let edge_node_seg_iter = rnd_edge_node_iter.zip(playlist.segments.values_mut());

@@ -12,7 +12,7 @@ pub trait PlaylistRewriter: Send + Sync {
     fn rewrite_playlist<'a>(
         &self,
         playlist: MediaPlaylist<'a>,
-        claims: &Claims,
+        node_group: &str,
     ) -> MediaPlaylist<'a>;
 }
 
@@ -30,12 +30,12 @@ impl PlaylistRewriter for CombinedPlaylistRewriter {
     fn rewrite_playlist<'a>(
         &self,
         playlist: MediaPlaylist<'a>,
-        claims: &Claims,
+        node_group: &str,
     ) -> MediaPlaylist<'a> {
         let mut playlist = playlist;
 
         for rewriter in self.rewriters.iter() {
-            playlist = rewriter.rewrite_playlist(playlist, claims);
+            playlist = rewriter.rewrite_playlist(playlist, node_group);
         }
 
         playlist

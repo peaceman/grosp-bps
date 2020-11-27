@@ -51,7 +51,7 @@ mod tests {
         };
 
         // rewrite
-        let media_playlist = signer.rewrite_playlist(media_playlist);
+        let media_playlist = signer.rewrite_playlist(media_playlist, "test");
         let uris: Vec<Cow<str>> = media_playlist
             .segments
             .values()
@@ -133,7 +133,7 @@ where
     fn rewrite_playlist<'a>(
         &self,
         mut playlist: MediaPlaylist<'a>,
-        claims: &Claims,
+        node_group: &str,
     ) -> MediaPlaylist<'a> {
         let valid_until = (SystemTime::now() + self.expiry_duration).duration_since(UNIX_EPOCH);
 
