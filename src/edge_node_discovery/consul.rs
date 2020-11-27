@@ -83,7 +83,7 @@ async fn update_edge_nodes_loop(
                         .into_iter()
                         .fold(HashMap::new(), |mut acc, en| {
                             acc.entry(en.group.clone())
-                                .or_insert_with(|| vec![])
+                                .or_insert_with(Vec::new)
                                 .push(en);
 
                             acc
