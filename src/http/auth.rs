@@ -16,7 +16,7 @@ pub enum Error {
 
 impl warp::reject::Reject for Error {}
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Claims {
     // Expiry epoch
     exp: u64,
@@ -82,4 +82,225 @@ fn validate_stream_name(
             false => None,
         })
         .ok_or(Error::JWTStreamNameMismatch)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config;
+    use crate::config::AppConfig;
+    use crate::http::auth::{validate_jwt, Claims, Error};
+    use jsonwebtoken::{Algorithm, EncodingKey, Header};
+    use regex::Regex;
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use url::Url;
+    use warp::reject::InvalidQuery;
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    fn config() -> std::result::Result<AppConfig, Box<dyn std::error::Error>> {
+        Ok(Arc::new(config::Config {
+            consul: config::Consul {
+                base_url: Url::parse("http://localhost:8500")?,
+                update_interval: Default::default(),
+            },
+            playlist: config::Playlist {
+                upstream_base_url: Url::parse("http://localhost")?,
+                segment_signing: config::SegmentSigning {
+                    key: "".to_string(),
+                    duration: Default::default(),
+                },
+                jwt_validation: config::JwtValidation {
+                    secret: "secret".to_string(),
+                    stream_name_pattern: Regex::new(r"([^/]+)\.m3u8")?,
+                },
+            },
+            http: config::Http {
+                socket: "[::]:23".parse()?,
+            },
+        }))
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_missing_query_params() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let result = warp::test::request()
+            .path("/meca-foo.m3u8")
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_err(), "request did not fail");
+
+        let err = result.unwrap_err();
+        let dc_err = err.find::<InvalidQuery>();
+
+        assert!(
+            dc_err.is_some(),
+            "expected invalid query error got {:?}",
+            err
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_non_jwt_content() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let result = warp::test::request()
+            .path("/meca-foo.m3u8?jwt=foo")
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_err(), "request did not fail");
+
+        let err = result.unwrap_err();
+        let dc_err = err
+            .find::<Error>()
+            .filter(|e| matches!(e, Error::JWTTokenError));
+
+        assert!(dc_err.is_some(), "expected jwt token error got {:?}", err);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_invalid_signature() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let claims = Claims {
+            exp: (SystemTime::now() + Duration::from_secs(600))
+                .duration_since(UNIX_EPOCH)?
+                .as_secs(),
+            sn: "stream-name".to_string(),
+            ng: "node-group".to_string(),
+        };
+
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS512),
+            &claims,
+            &EncodingKey::from_secret("foo".as_bytes()),
+        )?;
+
+        let result = warp::test::request()
+            .path(format!("/meca-foo.m3u8?jwt={}", token).as_str())
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_err(), "request did not fail");
+
+        let err = result.unwrap_err();
+        let dc_err = err
+            .find::<Error>()
+            .filter(|e| matches!(e, Error::JWTTokenError));
+
+        assert!(dc_err.is_some(), "expected jwt token error got {:?}", err);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_expired() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let claims = Claims {
+            exp: (SystemTime::now() - Duration::from_secs(600))
+                .duration_since(UNIX_EPOCH)?
+                .as_secs(),
+            sn: "stream-name".to_string(),
+            ng: "node-group".to_string(),
+        };
+
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS512),
+            &claims,
+            &EncodingKey::from_secret("secret".as_bytes()),
+        )?;
+
+        let result = warp::test::request()
+            .path(format!("/meca-foo.m3u8?jwt={}", token).as_str())
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_err(), "request did not fail");
+
+        let err = result.unwrap_err();
+        let dc_err = err
+            .find::<Error>()
+            .filter(|e| matches!(e, Error::JWTTokenError));
+
+        assert!(dc_err.is_some(), "expected jwt token error got {:?}", err);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_stream_name_mismatch() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let claims = Claims {
+            exp: (SystemTime::now() + Duration::from_secs(600))
+                .duration_since(UNIX_EPOCH)?
+                .as_secs(),
+            sn: "meca-foo".to_string(),
+            ng: "node-group".to_string(),
+        };
+
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS512),
+            &claims,
+            &EncodingKey::from_secret("secret".as_bytes()),
+        )?;
+
+        let result = warp::test::request()
+            .path(format!("/nonono.m3u8?jwt={}", token).as_str())
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_err(), "request did not fail");
+        let err = result.unwrap_err();
+        let dc_err = err
+            .find::<Error>()
+            .filter(|e| matches!(e, Error::JWTStreamNameMismatch));
+
+        assert!(
+            dc_err.is_some(),
+            "expected jwt stream name mismatch error got {:?}",
+            err
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt() -> TestResult {
+        let filter = validate_jwt(config()?);
+
+        let claims = Claims {
+            exp: (SystemTime::now() + Duration::from_secs(600))
+                .duration_since(UNIX_EPOCH)?
+                .as_secs(),
+            sn: "meca-foo".to_string(),
+            ng: "node-group".to_string(),
+        };
+
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS512),
+            &claims,
+            &EncodingKey::from_secret("secret".as_bytes()),
+        )?;
+
+        let result = warp::test::request()
+            .path(format!("/meca-foo.m3u8?jwt={}", token).as_str())
+            .filter(&filter)
+            .await;
+
+        assert!(result.is_ok());
+
+        let parsed_claims = result.unwrap();
+        assert_eq!(claims, parsed_claims);
+
+        Ok(())
+    }
 }

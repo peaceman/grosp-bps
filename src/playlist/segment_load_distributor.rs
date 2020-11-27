@@ -34,7 +34,7 @@ mod tests {
                     .iter()
                     .map(|v| EdgeNode {
                         url: v.clone(),
-                        group: String::from("group"),
+                        group: String::from(node_group),
                     })
                     .collect(),
             )

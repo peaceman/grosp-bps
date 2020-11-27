@@ -35,6 +35,7 @@ pub struct Playlist {
 #[derive(Debug, Deserialize)]
 pub struct SegmentSigning {
     pub key: String,
+    #[serde(with = "humantime_serde")]
     pub duration: Duration,
 }
 
