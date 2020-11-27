@@ -1,5 +1,6 @@
 use anyhow::Context;
 use log::info;
+use regex::Regex;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::BufReader;
@@ -40,7 +41,8 @@ pub struct SegmentSigning {
 #[derive(Debug, Deserialize)]
 pub struct JwtValidation {
     pub secret: String,
-    pub stream_name_pattern: String,
+    #[serde(with = "serde_regex")]
+    pub stream_name_pattern: Regex,
 }
 
 #[derive(Debug, Deserialize)]

@@ -27,4 +27,6 @@ humantime-serde = "1.0.0"
 jsonwebtoken = "7.2"
 futures = "0.3.8"
 thiserror = "1.0.22"
+regex = "1.4"
+serde_regex = "1.1"
 consul-api-client = { git = "https://github.com/peaceman/rust-consul-api-client", branch = "master" }

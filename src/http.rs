@@ -37,8 +37,8 @@ pub fn create_routes(
 
     let get_playlist = warp::path("playlist")
         .and(warp::get())
-        .and(warp::path::tail())
         .and(validate_jwt(Arc::clone(&config)))
+        .and(warp::path::tail())
         .and(http_client)
         .and(base_url)
         .and(playlist_rewriter)
@@ -61,8 +61,8 @@ struct FetchError {
 impl warp::reject::Reject for FetchError {}
 
 async fn get_playlist(
-    tail: warp::path::Tail,
     claims: Claims,
+    tail: warp::path::Tail,
     http_client: Client,
     base_url: Url,
     playlist_rewriter: Arc<dyn PlaylistRewriter>,
