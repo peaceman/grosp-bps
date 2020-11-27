@@ -7,23 +7,24 @@ use url::Url;
 
 use super::{EdgeNode, EdgeNodeList, EdgeNodeProvider};
 use consul_api_client::health::{Health, ServiceEntry};
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
-type EdgeNodeStorage = RwLock<EdgeNodeList>;
+type EdgeNodeStorage = RwLock<HashMap<String, EdgeNodeList>>;
 
 pub struct ConsulEdgeNodeProvider {
     edge_nodes: Arc<EdgeNodeStorage>,
 }
 
 impl EdgeNodeProvider for ConsulEdgeNodeProvider {
-    fn get_edge_nodes(&self) -> EdgeNodeList {
-        self.current_edge_nodes()
+    fn get_edge_nodes(&self, node_group: &str) -> EdgeNodeList {
+        self.current_edge_nodes(node_group)
     }
 }
 
 impl ConsulEdgeNodeProvider {
     pub fn new(consul: Client, update_interval: Duration) -> Self {
-        let edge_nodes = Arc::new(RwLock::new(Arc::new(vec![])));
+        let edge_nodes = Arc::new(RwLock::new(HashMap::new()));
 
         let provider = ConsulEdgeNodeProvider {
             edge_nodes: Arc::clone(&edge_nodes),
@@ -34,8 +35,14 @@ impl ConsulEdgeNodeProvider {
         provider
     }
 
-    fn current_edge_nodes(&self) -> EdgeNodeList {
-        Arc::clone(&self.edge_nodes.read().unwrap())
+    fn current_edge_nodes(&self, node_group: &str) -> EdgeNodeList {
+        let grouped = self.edge_nodes.read().unwrap();
+        let wanted = grouped.get(node_group);
+
+        wanted
+            .or_else(|| grouped.get("std")) // todo configurable
+            .map(|list| Arc::clone(list))
+            .unwrap_or_else(|| Arc::new(vec![]))
     }
 }
 
@@ -70,7 +77,20 @@ async fn update_edge_nodes_loop(
         match fetch_edge_nodes_from_consul(&client).await {
             Ok(new_edge_nodes) => {
                 info!("Updating edge nodes from consul: {:?}", &new_edge_nodes);
-                *edge_nodes.write().unwrap() = Arc::new(new_edge_nodes)
+
+                let grouped: HashMap<String, Vec<EdgeNode>> =
+                    new_edge_nodes
+                        .into_iter()
+                        .fold(HashMap::new(), |mut acc, en| {
+                            acc.entry(en.group.clone())
+                                .or_insert_with(|| vec![])
+                                .push(en);
+
+                            acc
+                        });
+
+                *edge_nodes.write().unwrap() =
+                    grouped.into_iter().map(|(k, v)| (k, Arc::new(v))).collect();
             }
             Err(e) => {
                 error!("Failed to update edge nodes from consul: {}", e);

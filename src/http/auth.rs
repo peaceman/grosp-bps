@@ -19,9 +19,18 @@ impl warp::reject::Reject for Error {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Claims {
+    // Expiry epoch
     exp: u64,
+    // Stream name
     sn: String,
+    // NodeGroup name
     ng: String,
+}
+
+impl Claims {
+    pub fn node_group(&self) -> &str {
+        self.ng.as_str()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

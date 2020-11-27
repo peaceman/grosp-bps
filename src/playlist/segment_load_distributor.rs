@@ -1,4 +1,5 @@
 use crate::edge_node_discovery::{EdgeNodeList, EdgeNodeProvider};
+use crate::http::auth::Claims;
 use crate::playlist::PlaylistRewriter;
 use hls_m3u8::{MediaPlaylist, MediaSegment};
 use log::warn;
@@ -28,7 +29,7 @@ mod tests {
     }
 
     impl EdgeNodeProvider for MockEdgeNodeProvider {
-        fn get_edge_nodes(&self) -> EdgeNodeList {
+        fn get_edge_nodes(&self, node_group: &str) -> EdgeNodeList {
             Arc::new(
                 self.edge_nodes
                     .iter()
@@ -129,8 +130,12 @@ where
     T: EdgeNodeProvider,
     U: Rng + Send + Sync,
 {
-    fn rewrite_playlist<'a>(&self, mut playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
-        let edge_nodes = self.edge_node_provider.get_edge_nodes();
+    fn rewrite_playlist<'a>(
+        &self,
+        mut playlist: MediaPlaylist<'a>,
+        claims: &Claims,
+    ) -> MediaPlaylist<'a> {
+        let edge_nodes = self.edge_node_provider.get_edge_nodes(claims.node_group());
         let rnd_edge_node_iter = RndEdgeNodeUrlIter::new(&edge_nodes, (self.rng_provider)());
 
         let edge_node_seg_iter = rnd_edge_node_iter.zip(playlist.segments.values_mut());

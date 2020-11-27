@@ -6,7 +6,7 @@ use url::Url;
 pub use consul::ConsulEdgeNodeProvider;
 
 pub trait EdgeNodeProvider: Send + Sync {
-    fn get_edge_nodes(&self) -> EdgeNodeList;
+    fn get_edge_nodes(&self, node_group: &str) -> EdgeNodeList;
 }
 
 pub type EdgeNodeList = Arc<Vec<EdgeNode>>;

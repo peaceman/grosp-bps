@@ -1,3 +1,4 @@
+use crate::http::auth::Claims;
 use crate::playlist::PlaylistRewriter;
 use hls_m3u8::MediaPlaylist;
 use hmac::{Hmac, Mac, NewMac};
@@ -129,7 +130,11 @@ impl<T> PlaylistRewriter for SegmentUrlSigner<T>
 where
     T: UrlSigner,
 {
-    fn rewrite_playlist<'a>(&self, mut playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
+    fn rewrite_playlist<'a>(
+        &self,
+        mut playlist: MediaPlaylist<'a>,
+        claims: &Claims,
+    ) -> MediaPlaylist<'a> {
         let valid_until = (SystemTime::now() + self.expiry_duration).duration_since(UNIX_EPOCH);
 
         // skip playlist modification if we cant get a valid expiry unix timestamp

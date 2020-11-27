@@ -1,4 +1,4 @@
-mod auth;
+pub mod auth;
 mod problem;
 
 use anyhow::Context;
@@ -76,10 +76,10 @@ async fn get_playlist(
         .await
         .map_err(warp::reject::custom)?;
 
-    let response = match upstream_response_body.parse::<MediaPlaylist>() {
-        Err(_) => upstream_response_body,
-        Ok(playlist) => playlist_rewriter.rewrite_playlist(playlist).to_string(),
-    };
+    let response = upstream_response_body
+        .parse::<MediaPlaylist>()
+        .map(|pl| playlist_rewriter.rewrite_playlist(pl, &claims).to_string())
+        .unwrap_or(upstream_response_body);
 
     Ok(Box::new(Response::new(response)))
 }

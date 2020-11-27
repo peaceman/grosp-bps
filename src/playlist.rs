@@ -3,12 +3,17 @@ mod segment_url_signer;
 
 use hls_m3u8::MediaPlaylist;
 
+use crate::http::auth::Claims;
 pub use segment_load_distributor::SegmentLoadDistributor;
 pub use segment_url_signer::HmacUrlSigner;
 pub use segment_url_signer::SegmentUrlSigner;
 
 pub trait PlaylistRewriter: Send + Sync {
-    fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a>;
+    fn rewrite_playlist<'a>(
+        &self,
+        playlist: MediaPlaylist<'a>,
+        claims: &Claims,
+    ) -> MediaPlaylist<'a>;
 }
 
 pub struct CombinedPlaylistRewriter {
@@ -22,11 +27,15 @@ impl CombinedPlaylistRewriter {
 }
 
 impl PlaylistRewriter for CombinedPlaylistRewriter {
-    fn rewrite_playlist<'a>(&self, playlist: MediaPlaylist<'a>) -> MediaPlaylist<'a> {
+    fn rewrite_playlist<'a>(
+        &self,
+        playlist: MediaPlaylist<'a>,
+        claims: &Claims,
+    ) -> MediaPlaylist<'a> {
         let mut playlist = playlist;
 
         for rewriter in self.rewriters.iter() {
-            playlist = rewriter.rewrite_playlist(playlist);
+            playlist = rewriter.rewrite_playlist(playlist, claims);
         }
 
         playlist
