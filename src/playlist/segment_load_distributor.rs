@@ -1,5 +1,4 @@
 use crate::edge_node_discovery::{EdgeNodeList, EdgeNodeProvider};
-use crate::http::auth::Claims;
 use crate::playlist::PlaylistRewriter;
 use hls_m3u8::{MediaPlaylist, MediaSegment};
 use log::warn;

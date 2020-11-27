@@ -1,6 +1,5 @@
 use crate::config::AppConfig;
 use crate::http::WebResult;
-use futures::future;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

@@ -3,7 +3,6 @@ mod segment_url_signer;
 
 use hls_m3u8::MediaPlaylist;
 
-use crate::http::auth::Claims;
 pub use segment_load_distributor::SegmentLoadDistributor;
 pub use segment_url_signer::HmacUrlSigner;
 pub use segment_url_signer::SegmentUrlSigner;

@@ -12,7 +12,6 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Client;
 use std::sync::Arc;
-use warp::Rejection;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

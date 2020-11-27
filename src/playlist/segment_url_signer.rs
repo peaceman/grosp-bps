@@ -1,4 +1,3 @@
-use crate::http::auth::Claims;
 use crate::playlist::PlaylistRewriter;
 use hls_m3u8::MediaPlaylist;
 use hmac::{Hmac, Mac, NewMac};
@@ -133,7 +132,7 @@ where
     fn rewrite_playlist<'a>(
         &self,
         mut playlist: MediaPlaylist<'a>,
-        node_group: &str,
+        _node_group: &str,
     ) -> MediaPlaylist<'a> {
         let valid_until = (SystemTime::now() + self.expiry_duration).duration_since(UNIX_EPOCH);
 

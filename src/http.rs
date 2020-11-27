@@ -5,7 +5,6 @@ use anyhow::Context;
 use hls_m3u8::MediaPlaylist;
 use log::debug;
 use reqwest::{Client, Url};
-use serde::Deserialize;
 use std::sync::Arc;
 use warp::{filters::BoxedFilter, http::Response, reject, Filter, Rejection, Reply};
 
@@ -13,13 +12,12 @@ use self::problem::from_anyhow;
 use crate::config::AppConfig;
 use crate::http::auth::{validate_jwt, Claims};
 use crate::playlist::PlaylistRewriter;
-use warp::http::StatusCode;
 
 pub type WebResult<T> = std::result::Result<T, Rejection>;
 
 pub async fn jwt_handler(claims: Claims) -> WebResult<impl Reply> {
     Ok(Response::new(
-        serde_yaml::to_string(&claims).map_err(|e| reject::not_found())?,
+        serde_yaml::to_string(&claims).map_err(|_e| reject::not_found())?,
     ))
 }
 
