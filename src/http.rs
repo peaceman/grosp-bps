@@ -12,6 +12,8 @@ use self::problem::from_anyhow;
 use crate::config::AppConfig;
 use crate::http::auth::{validate_jwt, Claims};
 use crate::playlist::PlaylistRewriter;
+use hyper::http;
+use hyper::http::HeaderValue;
 
 pub type WebResult<T> = std::result::Result<T, Rejection>;
 
@@ -83,7 +85,13 @@ async fn get_playlist(
         })
         .unwrap_or(upstream_response_body);
 
-    Ok(Box::new(Response::new(response)))
+    let mut response = Response::new(response);
+    response.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/vnd.apple.mpegurl"),
+    );
+
+    Ok(Box::new(response))
 }
 
 fn build_playlist_url(
