@@ -54,10 +54,10 @@ name = "balancing-playlist-spreader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.13.0",
  "consul-api-client",
  "env_logger",
  "futures",
- "hex",
  "hls_m3u8",
  "hmac",
  "humantime-serde",

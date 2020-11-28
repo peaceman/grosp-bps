@@ -28,7 +28,7 @@ mod tests {
         let url = signer.sign(url, 23);
 
         assert_eq!(
-            "https://example.com/23.ts?e=23&h=e5030a591d2dd923f90d29600b0c02e458c0bc344b1ad8eb71a26cf636988b62",
+            "https://example.com/23.ts?e=23&h=5QMKWR0t2SP5DSlgCwwC5FjAvDRLGtjrcaJs9jaYi2I%3D",
             url.into_string()
         );
     }
@@ -95,7 +95,7 @@ impl UrlSigner for HmacUrlSigner {
 
         hmac.update(&content_to_sign.as_bytes());
         let signature = hmac.finalize();
-        let signature = hex::encode(signature.into_bytes());
+        let signature = base64::encode(signature.into_bytes());
 
         url.query_pairs_mut()
             .append_pair("e", &expiry_timestamp.to_string())
